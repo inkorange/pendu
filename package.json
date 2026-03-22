@@ -1,0 +1,50 @@
+{
+  "name": "@inkorange/pendu",
+  "version": "0.1.0",
+  "description": "Organic gallery layout engine for React",
+  "license": "MIT",
+  "author": "Chris West",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inkorange/pendu.git"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage --watchAll=false",
+    "changeset": "changeset",
+    "changeset:add": "changeset add",
+    "version": "changeset version",
+    "release": "npm run build && changeset publish",
+    "size": "size-limit",
+    "prepublishOnly": "npm run build",
+    "prepare": "husky"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
+    "typescript": "^5.5.0"
+  }
+}
