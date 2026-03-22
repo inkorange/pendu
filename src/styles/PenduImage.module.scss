@@ -1,0 +1,45 @@
+@use 'variables' as *;
+
+.frame {
+  position: absolute;
+  border-radius: var(--pendu-frame-radius);
+  box-shadow: var(--pendu-frame-shadow);
+  border: var(--pendu-frame-border);
+  overflow: var(--pendu-frame-overflow);
+  transition:
+    transform var(--pendu-transition-duration) var(--pendu-transition-easing),
+    opacity var(--pendu-transition-duration) var(--pendu-transition-easing);
+}
+
+.skeleton {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--pendu-skeleton-bg);
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--pendu-transition-duration) var(--pendu-transition-easing);
+}
+
+.imageLoaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame {
+    transition: none;
+  }
+
+  .image {
+    transition: none;
+    opacity: 1;
+  }
+}

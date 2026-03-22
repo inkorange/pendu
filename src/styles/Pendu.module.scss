@@ -1,0 +1,10 @@
+@use 'variables' as *;
+
+.root {
+  @include pendu-defaults;
+
+  position: relative;
+  background: var(--pendu-bg);
+  padding: var(--pendu-padding);
+  width: 100%;
+}
