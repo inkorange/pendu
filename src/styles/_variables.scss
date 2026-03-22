@@ -1,0 +1,18 @@
+$pendu-defaults: (
+  --pendu-bg: transparent,
+  --pendu-gap: 16px,
+  --pendu-padding: 10px,
+  --pendu-frame-radius: 0,
+  --pendu-frame-shadow: none,
+  --pendu-frame-border: none,
+  --pendu-frame-overflow: visible,
+  --pendu-transition-duration: 300ms,
+  --pendu-transition-easing: ease-out,
+  --pendu-skeleton-bg: #e0e0e0,
+);
+
+@mixin pendu-defaults {
+  @each $var, $value in $pendu-defaults {
+    #{$var}: #{$value};
+  }
+}
