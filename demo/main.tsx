@@ -3,16 +3,23 @@ import { createRoot } from 'react-dom/client';
 import { Pendu } from '../src/Pendu';
 
 // All demo images with their actual dimensions
-const ALL_IMAGES = [
-  { id: 'L1', src: '../resources/demo/landscape-1.jpg', width: 1200, height: 800, label: 'Landscape 1' },
-  { id: 'L2', src: '../resources/demo/landscape-2.jpg', width: 1600, height: 1000, label: 'Landscape 2' },
-  { id: 'L3', src: '../resources/demo/landscape-3.jpg', width: 1400, height: 800, label: 'Landscape 3' },
-  { id: 'L4', src: '../resources/demo/landscape-4.jpg', width: 900, height: 600, label: 'Landscape 4' },
-  { id: 'P1', src: '../resources/demo/portrait-1.jpg', width: 800, height: 1200, label: 'Portrait 1' },
-  { id: 'P2', src: '../resources/demo/portrait-2.jpg', width: 800, height: 800, label: 'Square' },
-  { id: 'P3', src: '../resources/demo/portrait-3.jpg', width: 1200, height: 1800, label: 'Portrait 3' },
-  { id: 'P4', src: '../resources/demo/portrait-4.jpg', width: 1200, height: 1600, label: 'Portrait 4' },
+// 8 base images — duplicated with unique IDs to support up to 18
+const BASE_IMAGES = [
+  { src: '../resources/demo/landscape-1.jpg', width: 1200, height: 800, label: 'Landscape 1' },
+  { src: '../resources/demo/landscape-2.jpg', width: 1600, height: 1000, label: 'Landscape 2' },
+  { src: '../resources/demo/landscape-3.jpg', width: 1400, height: 800, label: 'Landscape 3' },
+  { src: '../resources/demo/landscape-4.jpg', width: 900, height: 600, label: 'Landscape 4' },
+  { src: '../resources/demo/portrait-1.jpg', width: 800, height: 1200, label: 'Portrait 1' },
+  { src: '../resources/demo/portrait-2.jpg', width: 800, height: 800, label: 'Square' },
+  { src: '../resources/demo/portrait-3.jpg', width: 1200, height: 1800, label: 'Portrait 3' },
+  { src: '../resources/demo/portrait-4.jpg', width: 1200, height: 1600, label: 'Portrait 4' },
 ];
+
+const ALL_IMAGES = Array.from({ length: 18 }, (_, i) => ({
+  ...BASE_IMAGES[i % BASE_IMAGES.length],
+  id: `img-${i}`,
+  label: `${BASE_IMAGES[i % BASE_IMAGES.length].label}${i >= BASE_IMAGES.length ? ` (${Math.floor(i / BASE_IMAGES.length) + 1})` : ''}`,
+}));
 
 function App() {
   const [count, setCount] = useState(5);
@@ -55,7 +62,7 @@ function App() {
           <input
             type="range"
             min={0}
-            max={ALL_IMAGES.length}
+            max={18}
             value={count}
             onChange={handleCountChange}
           />
