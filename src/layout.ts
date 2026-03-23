@@ -70,8 +70,9 @@ export function computeLayout(
 
         let score = scorePosition(c, placed, centerX, centerY, opts.gap, prng());
 
-        // Penalize candidates that would push cluster far beyond container width
-        // Only apply after enough frames are placed to form a meaningful cluster
+        // Soft penalty for exceeding container — allow up to 120% before
+        // penalizing, since scale3d handles the visual fit. This lets the
+        // cluster use more of the available space.
         if (placed.length >= 4) {
           const allFrames = [...placed, c];
           let clusterMinX = Infinity, clusterMaxX = -Infinity;
@@ -80,8 +81,9 @@ export function computeLayout(
             if (f.x + f.width > clusterMaxX) clusterMaxX = f.x + f.width;
           }
           const projectedWidth = clusterMaxX - clusterMinX;
-          if (projectedWidth > opts.containerWidth) {
-            score -= (projectedWidth - opts.containerWidth) * 2;
+          const threshold = opts.containerWidth * 1.2;
+          if (projectedWidth > threshold) {
+            score -= (projectedWidth - threshold) * 1.5;
           }
         }
 

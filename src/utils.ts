@@ -51,36 +51,26 @@ export function computeBaseSize(
 ): { width: number; height: number } {
   const aspect = image.width / image.height;
 
-  // Scale the grid divisor based on image count so more images use
-  // more columns/rows, filling the available space instead of stacking.
-  // Target roughly sqrt(N) columns for a square-ish grid.
-  const cols = Math.max(2, Math.ceil(Math.sqrt(totalImages)));
-  const rows = Math.max(2, Math.ceil(totalImages / cols));
-
-  let w: number;
-  let h: number;
-
-  if (aspect >= 1) {
-    // Landscape or square — size relative to columns
-    w = containerWidth / cols;
-    h = w / aspect;
-  } else {
-    // Portrait — size relative to rows
-    h = containerHeight / rows;
-    w = h * aspect;
-  }
+  // Size frames so the total cluster area roughly fills the container.
+  // Target: each frame occupies ~(containerArea / totalImages) pixels,
+  // which gives us a target frame area to derive width and height from.
+  const containerArea = containerWidth * containerHeight;
+  const targetFrameArea = containerArea / Math.max(1, totalImages);
+  // Derive width from area: area = w * h = w * (w / aspect) = w² / aspect
+  // So w = sqrt(area * aspect)
+  let w = Math.sqrt(targetFrameArea * aspect);
+  let h = w / aspect;
 
   // Clamp so no single frame dominates the container
-  const maxW = containerWidth * 0.5;
-  const maxH = containerHeight * 0.5;
-  if (w > maxW) {
-    w = maxW;
-    h = w / aspect;
-  }
-  if (h > maxH) {
-    h = maxH;
-    w = h * aspect;
-  }
+  const maxW = containerWidth * 0.45;
+  const maxH = containerHeight * 0.45;
+  if (w > maxW) { w = maxW; h = w / aspect; }
+  if (h > maxH) { h = maxH; w = h * aspect; }
+
+  // Minimum size — but don't let it override the max clamp
+  const minDim = 40;
+  w = Math.max(minDim, Math.min(w, maxW));
+  h = Math.max(minDim, Math.min(h, maxH));
 
   return { width: Math.round(w), height: Math.round(h) };
 }
