@@ -223,8 +223,14 @@ function PenduComponent({
 
   const availableWidth = containerWidth - padding * 2;
   const layoutWidth = layout ? layout.bounds.width : 0;
-  const horizontalOffset = layout ? (availableWidth - layoutWidth) / 2 : 0;
-  const containerHeight = layout ? layout.bounds.height + padding * 2 : 0;
+  const layoutHeight = layout ? layout.bounds.height : 0;
+
+  // Scale the entire layout to fit within the container if it overflows
+  const fitScale = layoutWidth > availableWidth ? availableWidth / layoutWidth : 1;
+  const scaledLayoutWidth = layoutWidth * fitScale;
+  const scaledLayoutHeight = layoutHeight * fitScale;
+  const horizontalOffset = (availableWidth - scaledLayoutWidth) / 2;
+  const containerHeight = layout ? scaledLayoutHeight + padding * 2 : 0;
 
   const rootStyle: React.CSSProperties = {
     ...CSS_VAR_DEFAULTS,
@@ -235,8 +241,20 @@ function PenduComponent({
     width: '100%',
     height: containerHeight > 0 ? containerHeight : 'auto',
     background: 'var(--pendu-bg)',
+    overflow: 'hidden' as const,
     ...style,
   } as React.CSSProperties;
+
+  // Inner wrapper uses scale3d for GPU-accelerated fitting
+  const innerStyle: React.CSSProperties = {
+    position: 'absolute' as const,
+    left: padding + horizontalOffset,
+    top: padding,
+    width: layoutWidth,
+    height: layoutHeight,
+    transform: fitScale < 1 ? `scale3d(${fitScale}, ${fitScale}, 1)` : undefined,
+    transformOrigin: 'top left',
+  };
 
   return (
     <div
@@ -244,30 +262,31 @@ function PenduComponent({
       className={['pendu', className].filter(Boolean).join(' ')}
       style={rootStyle}
     >
-      {layout &&
-        childItems.map((child, index) => {
-          const frame = layout.frames[index];
-          if (!frame) return null;
+      {layout && (
+        <div style={innerStyle}>
+          {childItems.map((child, index) => {
+            const frame = layout.frames[index];
+            if (!frame) return null;
 
-          // Position relative to layout bounds (normalize to 0,0 origin)
-          // Offset by padding so frames sit inside the container's padded area
-          const frameStyle: React.CSSProperties = {
-            position: 'absolute',
-            left: frame.x - layout.bounds.minX + padding + horizontalOffset,
-            top: frame.y - layout.bounds.minY + padding,
-            width: frame.width,
-            height: frame.height,
-          };
+            const frameStyle: React.CSSProperties = {
+              position: 'absolute',
+              left: frame.x - layout.bounds.minX,
+              top: frame.y - layout.bounds.minY,
+              width: frame.width,
+              height: frame.height,
+            };
 
-          return React.cloneElement(
-            <PenduImage
-              key={child.key}
-              {...child.props}
-              _frameStyle={frameStyle}
-            />,
-            { 'data-pendu-key': child.key } as Record<string, string>,
-          );
-        })}
+            return React.cloneElement(
+              <PenduImage
+                key={child.key}
+                {...child.props}
+                _frameStyle={frameStyle}
+              />,
+              { 'data-pendu-key': child.key } as Record<string, string>,
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
