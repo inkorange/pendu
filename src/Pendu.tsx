@@ -120,29 +120,43 @@ function PenduComponent({
     const el = containerRef.current;
     if (!el) return;
 
+    const parentEl = el.parentElement;
+
+    // Observe the Pendu element for width changes
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const width = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
-        const height = entry.contentBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
         setContainerWidth(Math.round(width));
-        setContainerMeasuredHeight(Math.round(height));
-
-        // Detect if parent imposes a fixed height constraint.
-        // getComputedStyle().height always resolves to px, so we check
-        // the parent's overflow and the inline/CSS height property instead.
-        const parentEl = el.parentElement;
-        if (parentEl) {
-          const parentStyle = getComputedStyle(parentEl);
-          const parentOverflow = parentStyle.overflow || parentStyle.overflowY;
-          const hasExplicitHeight = parentEl.style.height !== '' && parentEl.style.height !== 'auto';
-          const hasOverflowClip = parentOverflow === 'hidden' || parentOverflow === 'scroll' || parentOverflow === 'auto';
-          hasFixedHeight.current = hasExplicitHeight || hasOverflowClip;
-        }
       }
     });
-
     observer.observe(el);
-    return () => observer.disconnect();
+
+    // Observe the PARENT element for height constraints
+    // This avoids feedback loops — the parent's height is the input constraint,
+    // the Pendu element's height is the output.
+    let parentObserver: ResizeObserver | null = null;
+    if (parentEl) {
+      parentObserver = new ResizeObserver(() => {
+        const parentStyle = getComputedStyle(parentEl);
+        const parentOverflow = parentStyle.overflow || parentStyle.overflowY;
+        const hasExplicitHeight = parentEl.style.height !== '' && parentEl.style.height !== 'auto';
+        const hasOverflowClip = parentOverflow === 'hidden' || parentOverflow === 'scroll' || parentOverflow === 'auto';
+        hasFixedHeight.current = hasExplicitHeight || hasOverflowClip;
+
+        if (hasFixedHeight.current) {
+          // Use parent's clientHeight as the available height constraint
+          setContainerMeasuredHeight(parentEl.clientHeight);
+        } else {
+          setContainerMeasuredHeight(0);
+        }
+      });
+      parentObserver.observe(parentEl);
+    }
+
+    return () => {
+      observer.disconnect();
+      parentObserver?.disconnect();
+    };
   }, []);
 
   // ---------------------------------------------------------------------------
