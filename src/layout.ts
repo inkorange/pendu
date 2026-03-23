@@ -68,7 +68,23 @@ export function computeLayout(
       for (const c of candidates) {
         if (!fitsWithoutOverlap(c, placed, opts.gap)) continue;
 
-        const score = scorePosition(c, placed, centerX, centerY, opts.gap, prng());
+        let score = scorePosition(c, placed, centerX, centerY, opts.gap, prng());
+
+        // Penalize candidates that would push cluster far beyond container width
+        // Only apply after enough frames are placed to form a meaningful cluster
+        if (placed.length >= 4) {
+          const allFrames = [...placed, c];
+          let clusterMinX = Infinity, clusterMaxX = -Infinity;
+          for (const f of allFrames) {
+            if (f.x < clusterMinX) clusterMinX = f.x;
+            if (f.x + f.width > clusterMaxX) clusterMaxX = f.x + f.width;
+          }
+          const projectedWidth = clusterMaxX - clusterMinX;
+          if (projectedWidth > opts.containerWidth) {
+            score -= (projectedWidth - opts.containerWidth) * 2;
+          }
+        }
+
         if (score > bestScore) {
           bestScore = score;
           bestCandidate = {
@@ -101,38 +117,8 @@ export function computeLayout(
   let frames = compactToCenter(placed, centerX, centerY, opts.gap, 15);
   frames = fillInteriorGaps(frames, centerX, centerY, opts.gap, 5);
 
-  // Fit cluster to container and center it
+  // Re-center the cluster within the container
   if (frames.length > 0) {
-    const preBounds = computeBounds(frames);
-
-    // Scale down if cluster exceeds container width
-    if (preBounds.width > opts.containerWidth) {
-      const scaleFactor = opts.containerWidth / preBounds.width;
-      const clusterCX = preBounds.minX + preBounds.width / 2;
-      const clusterCY = preBounds.minY + preBounds.height / 2;
-
-      frames = frames.map((f) => {
-        const newW = f.width * scaleFactor;
-        const newH = f.height * scaleFactor;
-        // Scale position relative to cluster center
-        const newX = clusterCX + (f.x - clusterCX) * scaleFactor;
-        const newY = clusterCY + (f.y - clusterCY) * scaleFactor;
-        return {
-          ...f,
-          x: newX,
-          y: newY,
-          width: newW,
-          height: newH,
-          scale: f.scale * scaleFactor,
-        };
-      });
-
-      // Resolve any gap violations introduced by scaling, then re-compact
-      frames = resolveOverlaps(frames, opts.gap);
-      frames = compactToCenter(frames, centerX, centerY, opts.gap, 5);
-    }
-
-    // Re-center the cluster within the container
     const postBounds = computeBounds(frames);
     const clusterCX = postBounds.minX + postBounds.width / 2;
     const clusterCY = postBounds.minY + postBounds.height / 2;
