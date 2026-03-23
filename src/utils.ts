@@ -47,32 +47,30 @@ export function computeBaseSize(
   image: PenduImageData,
   containerWidth: number,
   containerHeight: number,
+  totalImages: number = 1,
 ): { width: number; height: number } {
   const aspect = image.width / image.height;
-  let w: number;
-  let h: number;
 
-  if (aspect >= 1) {
-    // Landscape or square
-    w = containerWidth / 3;
-    h = w / aspect;
-  } else {
-    // Portrait
-    h = containerHeight / 3;
-    w = h * aspect;
-  }
+  // Size frames so the total cluster area roughly fills the container.
+  // Target: each frame occupies ~(containerArea / totalImages) pixels,
+  // which gives us a target frame area to derive width and height from.
+  const containerArea = containerWidth * containerHeight;
+  const targetFrameArea = containerArea / Math.max(1, totalImages);
+  // Derive width from area: area = w * h = w * (w / aspect) = w² / aspect
+  // So w = sqrt(area * aspect)
+  let w = Math.sqrt(targetFrameArea * aspect);
+  let h = w / aspect;
 
   // Clamp so no single frame dominates the container
-  const maxW = containerWidth * 0.5;
-  const maxH = containerHeight * 0.5;
-  if (w > maxW) {
-    w = maxW;
-    h = w / aspect;
-  }
-  if (h > maxH) {
-    h = maxH;
-    w = h * aspect;
-  }
+  const maxW = containerWidth * 0.45;
+  const maxH = containerHeight * 0.45;
+  if (w > maxW) { w = maxW; h = w / aspect; }
+  if (h > maxH) { h = maxH; w = h * aspect; }
+
+  // Minimum size — but don't let it override the max clamp
+  const minDim = 40;
+  w = Math.max(minDim, Math.min(w, maxW));
+  h = Math.max(minDim, Math.min(h, maxH));
 
   return { width: Math.round(w), height: Math.round(h) };
 }
@@ -189,26 +187,38 @@ export function scorePosition(
   centerY: number,
   gap: number,
   random: number,
+  containerWidth: number = 680,
+  containerHeight: number = 680,
 ): number {
   const { contacts, contactLength } = getEdgeContact(candidate, placed, gap);
-  const dist = distToCenter(candidate, centerX, centerY);
+
+  // Use aspect-weighted distance so wide containers don't penalize
+  // horizontal spread as much as vertical spread (and vice versa)
+  const cx = candidate.x + candidate.width / 2;
+  const cy = candidate.y + candidate.height / 2;
+  const normalizedDx = (cx - centerX) / (containerWidth || 1);
+  const normalizedDy = (cy - centerY) / (containerHeight || 1);
+  const dist = Math.sqrt(normalizedDx * normalizedDx + normalizedDy * normalizedDy) * Math.max(containerWidth, containerHeight);
 
   // Randomness scales inversely with placed count — more organic variety
   // when few frames are placed, tighter clustering as the gallery fills
   const randomWeight = Math.max(20, 80 - placed.length * 8);
 
-  // Directional diversity: prevent column/row stacking when few frames placed.
-  // Measures aspect ratio of the cluster and strongly rewards candidates
-  // that balance the cluster toward a square shape.
+  // Directional diversity: reward candidates that balance the cluster
+  // toward a square/diamond shape radiating from center.
   let diversityBonus = 0;
-  if (placed.length < 8) {
+  {
     const candidateCX = candidate.x + candidate.width / 2;
     const candidateCY = candidate.y + candidate.height / 2;
 
-    // Compute current cluster extents
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
+    let sumX = 0, sumY = 0;
     for (const p of placed) {
+      const pcx = p.x + p.width / 2;
+      const pcy = p.y + p.height / 2;
+      sumX += pcx;
+      sumY += pcy;
       if (p.x < minX) minX = p.x;
       if (p.x + p.width > maxX) maxX = p.x + p.width;
       if (p.y < minY) minY = p.y;
@@ -219,19 +229,38 @@ export function scorePosition(
     const clusterH = maxY - minY || 1;
     const aspectRatio = clusterW / clusterH;
 
-    // If cluster is taller than wide (aspect < 1.0), strongly reward horizontal placement
-    if (aspectRatio < 1.0) {
-      const isHorizontal = candidateCX < minX || candidateCX > maxX;
-      if (isHorizontal) {
-        diversityBonus = 500 * (1 / aspectRatio);
-      }
-    }
-    // If cluster is much wider than tall (aspect > 1.5), reward vertical placement
-    else if (aspectRatio > 1.5) {
-      const isVertical = candidateCY < minY || candidateCY > maxY;
-      if (isVertical) {
-        diversityBonus = 300 * aspectRatio;
-      }
+    // Compute cluster centroid — candidates on the opposite side
+    // of the centroid from the cluster's center of mass get a bonus.
+    // This prevents staircase growth in one direction.
+    const centroidX = sumX / placed.length;
+    const centroidY = sumY / placed.length;
+    const clusterMidX = (minX + maxX) / 2;
+    const clusterMidY = (minY + maxY) / 2;
+
+    // How off-center is the mass? Positive = mass is right/below of geometric center
+    const xImbalance = centroidX - clusterMidX;
+    const yImbalance = centroidY - clusterMidY;
+
+    // Reward candidates that counterbalance the mass
+    // If mass is shifted right, reward candidates to the left (and vice versa)
+    const xBalance = (candidateCX < clusterMidX && xImbalance > 0) ||
+                     (candidateCX > clusterMidX && xImbalance < 0)
+                     ? Math.abs(xImbalance) * 2 : 0;
+    const yBalance = (candidateCY < clusterMidY && yImbalance > 0) ||
+                     (candidateCY > clusterMidY && yImbalance < 0)
+                     ? Math.abs(yImbalance) * 2 : 0;
+
+    diversityBonus += xBalance + yBalance;
+
+    // Aspect ratio correction: reward spreading in the short axis
+    if (aspectRatio < 0.8) {
+      // Taller than wide → reward horizontal extension
+      const extendsH = candidateCX < minX || candidateCX > maxX;
+      if (extendsH) diversityBonus += 300 * (1 / aspectRatio);
+    } else if (aspectRatio > 1.3) {
+      // Wider than tall → reward vertical extension
+      const extendsV = candidateCY < minY || candidateCY > maxY;
+      if (extendsV) diversityBonus += 300 * aspectRatio;
     }
   }
 
@@ -333,6 +362,19 @@ export function compactToCenter(
       (a, b) => distToCenter(a, centerX, centerY) - distToCenter(b, centerX, centerY),
     );
 
+    // Compute current cluster aspect ratio to bias compaction
+    // toward making the cluster more square/diamond shaped
+    const bounds = computeBounds(result);
+    const clusterW = bounds.width || 1;
+    const clusterH = bounds.height || 1;
+    const aspect = clusterW / clusterH;
+
+    // Dampen the axis that's already too short
+    // aspect < 1 = taller than wide → reduce vertical pull
+    // aspect > 1 = wider than tall → reduce horizontal pull
+    const xDampen = aspect > 1.3 ? 0.3 : 1.0;
+    const yDampen = aspect < 0.7 ? 0.3 : 1.0;
+
     let moved = false;
 
     for (const frame of sorted) {
@@ -346,8 +388,8 @@ export function compactToCenter(
       if (dist < 1) continue;
 
       const stepSize = Math.max(1, 8 - iter * 0.4);
-      const nx = (dx / dist) * stepSize;
-      const ny = (dy / dist) * stepSize;
+      const nx = (dx / dist) * stepSize * xDampen;
+      const ny = (dy / dist) * stepSize * yDampen;
 
       const moved_frame = { ...frame, x: frame.x + nx, y: frame.y + ny };
       const others = result.filter((_, i) => i !== idx);
@@ -465,6 +507,75 @@ export function localCompact(
     }
 
     if (!moved) break;
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Frame expansion — grow frames to fill available space
+// ---------------------------------------------------------------------------
+
+export function expandFrames(
+  frames: PlacedFrame[],
+  gap: number,
+  maxScale: number = 2.0,
+  passes: number = 5,
+): PlacedFrame[] {
+  const result = frames.map((f) => ({ ...f }));
+
+  for (let pass = 0; pass < passes; pass++) {
+    let anyGrew = false;
+
+    for (let i = 0; i < result.length; i++) {
+      const frame = result[i];
+      const aspect = frame.width / frame.height;
+      const others = result.filter((_, j) => j !== i);
+      const origW = frame.width;
+      const origH = frame.height;
+
+      // Binary search for the max growth factor that fits
+      let lo = 1.0;
+      let hi = maxScale / frame.scale;
+      if (hi <= 1.01) continue;
+
+      // Test upper bound first — if it fits, take it
+      const maxW = origW * hi;
+      const maxH = maxW / aspect;
+      const maxX = frame.x - (maxW - origW) / 2;
+      const maxY = frame.y - (maxH - origH) / 2;
+      if (fitsWithoutOverlap({ x: maxX, y: maxY, width: maxW, height: maxH }, others, gap)) {
+        result[i] = { ...result[i], x: maxX, y: maxY, width: maxW, height: maxH, scale: frame.scale * hi };
+        anyGrew = true;
+        continue;
+      }
+
+      // Binary search for the largest growth that fits
+      for (let step = 0; step < 8; step++) {
+        const mid = (lo + hi) / 2;
+        const w = origW * mid;
+        const h = w / aspect;
+        const x = frame.x - (w - origW) / 2;
+        const y = frame.y - (h - origH) / 2;
+
+        if (fitsWithoutOverlap({ x, y, width: w, height: h }, others, gap)) {
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+
+      if (lo > 1.02) {
+        const finalW = origW * lo;
+        const finalH = finalW / aspect;
+        const finalX = frame.x - (finalW - origW) / 2;
+        const finalY = frame.y - (finalH - origH) / 2;
+        result[i] = { ...result[i], x: finalX, y: finalY, width: finalW, height: finalH, scale: frame.scale * lo };
+        anyGrew = true;
+      }
+    }
+
+    if (!anyGrew) break;
   }
 
   return result;
