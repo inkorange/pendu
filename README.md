@@ -17,7 +17,7 @@
 </p>
 
 [![npm version](https://img.shields.io/npm/v/@inkorange/pendu)](https://www.npmjs.com/package/@inkorange/pendu)
-[![coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/inkorange/pendu)
+[![coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://github.com/inkorange/pendu)
 [![license](https://img.shields.io/npm/l/@inkorange/pendu)](https://github.com/inkorange/pendu/blob/main/LICENSE)
 
 ## Install
