@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Pendu } from '../src/Pendu';
 
-// All demo images with their actual dimensions
 // 8 base images — duplicated with unique IDs to support up to 18
 const BASE_IMAGES = [
   { src: '../resources/demo/landscape-1.jpg', width: 1200, height: 800, label: 'Landscape 1' },
@@ -21,11 +20,21 @@ const ALL_IMAGES = Array.from({ length: 18 }, (_, i) => ({
   label: `${BASE_IMAGES[i % BASE_IMAGES.length].label}${i >= BASE_IMAGES.length ? ` (${Math.floor(i / BASE_IMAGES.length) + 1})` : ''}`,
 }));
 
+type SizeMode = 'dynamic' | 'px' | '%';
+
 function App() {
   const [count, setCount] = useState(5);
   const [seed, setSeed] = useState(42);
   const [gap, setGap] = useState(16);
   const [images, setImages] = useState(() => ALL_IMAGES.slice(0, 5));
+
+  // Container sizing controls
+  const [widthMode, setWidthMode] = useState<SizeMode>('dynamic');
+  const [widthPx, setWidthPx] = useState(600);
+  const [widthPct, setWidthPct] = useState(80);
+  const [heightMode, setHeightMode] = useState<SizeMode>('dynamic');
+  const [heightPx, setHeightPx] = useState(400);
+  const [heightPct, setHeightPct] = useState(60);
 
   const handleCountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newCount = parseInt(e.target.value, 10);
@@ -52,6 +61,38 @@ function App() {
     setCount((prev) => Math.max(0, prev - 1));
   }, [images.length]);
 
+  // Compute container wrapper style
+  const containerWrapperStyle: React.CSSProperties = {};
+
+  if (widthMode === 'px') {
+    containerWrapperStyle.width = widthPx;
+    containerWrapperStyle.margin = '24px auto';
+  } else if (widthMode === '%') {
+    containerWrapperStyle.width = `${widthPct}%`;
+    containerWrapperStyle.margin = '24px auto';
+  } else {
+    containerWrapperStyle.maxWidth = 900;
+    containerWrapperStyle.margin = '24px auto';
+    containerWrapperStyle.padding = '0 24px';
+  }
+
+  if (heightMode === 'px') {
+    containerWrapperStyle.height = heightPx;
+    containerWrapperStyle.overflow = 'hidden';
+  } else if (heightMode === '%') {
+    containerWrapperStyle.height = `${heightPct}vh`;
+    containerWrapperStyle.overflow = 'hidden';
+  }
+  // dynamic height = no constraint (auto)
+
+  // Display string for stats
+  const widthLabel =
+    widthMode === 'px' ? `${widthPx}px` :
+    widthMode === '%' ? `${widthPct}%` : 'auto';
+  const heightLabel =
+    heightMode === 'px' ? `${heightPx}px` :
+    heightMode === '%' ? `${heightPct}vh` : 'auto';
+
   return (
     <>
       <div className="toolbar">
@@ -59,42 +100,72 @@ function App() {
 
         <label>
           Count:
-          <input
-            type="range"
-            min={0}
-            max={18}
-            value={count}
-            onChange={handleCountChange}
-          />
+          <input type="range" min={0} max={18} value={count} onChange={handleCountChange} />
           <span className="count">{count}</span>
         </label>
 
         <label>
           Gap:
-          <input
-            type="range"
-            min={0}
-            max={48}
-            value={gap}
-            onChange={(e) => setGap(parseInt(e.target.value, 10))}
-          />
+          <input type="range" min={0} max={48} value={gap} onChange={(e) => setGap(parseInt(e.target.value, 10))} />
           <span className="count">{gap}px</span>
         </label>
 
         <button onClick={handleNewLayout}>New Layout</button>
-        <button onClick={handleAddRandom} disabled={images.length >= ALL_IMAGES.length}>
-          + Add
-        </button>
-        <button onClick={handleRemoveLast} disabled={images.length === 0}>
-          - Remove
-        </button>
+        <button onClick={handleAddRandom} disabled={images.length >= ALL_IMAGES.length}>+ Add</button>
+        <button onClick={handleRemoveLast} disabled={images.length === 0}>- Remove</button>
+      </div>
+
+      <div className="toolbar toolbar--sizing">
+        <label>
+          Width:
+          <select value={widthMode} onChange={(e) => setWidthMode(e.target.value as SizeMode)}>
+            <option value="dynamic">Dynamic (auto)</option>
+            <option value="px">Fixed (px)</option>
+            <option value="%">Percentage (%)</option>
+          </select>
+        </label>
+
+        {widthMode === 'px' && (
+          <label>
+            <input type="range" min={200} max={1200} value={widthPx} onChange={(e) => setWidthPx(parseInt(e.target.value, 10))} />
+            <span className="count">{widthPx}px</span>
+          </label>
+        )}
+        {widthMode === '%' && (
+          <label>
+            <input type="range" min={20} max={100} value={widthPct} onChange={(e) => setWidthPct(parseInt(e.target.value, 10))} />
+            <span className="count">{widthPct}%</span>
+          </label>
+        )}
+
+        <label>
+          Height:
+          <select value={heightMode} onChange={(e) => setHeightMode(e.target.value as SizeMode)}>
+            <option value="dynamic">Dynamic (auto)</option>
+            <option value="px">Fixed (px)</option>
+            <option value="%">Viewport (vh)</option>
+          </select>
+        </label>
+
+        {heightMode === 'px' && (
+          <label>
+            <input type="range" min={100} max={800} value={heightPx} onChange={(e) => setHeightPx(parseInt(e.target.value, 10))} />
+            <span className="count">{heightPx}px</span>
+          </label>
+        )}
+        {heightMode === '%' && (
+          <label>
+            <input type="range" min={20} max={100} value={heightPct} onChange={(e) => setHeightPct(parseInt(e.target.value, 10))} />
+            <span className="count">{heightPct}vh</span>
+          </label>
+        )}
       </div>
 
       <div className="stats">
-        Seed: {seed} | Images: {images.length} | Gap: {gap}px
+        Seed: {seed} | Images: {images.length} | Gap: {gap}px | Container: {widthLabel} × {heightLabel}
       </div>
 
-      <div className="gallery-container">
+      <div className="gallery-container" style={containerWrapperStyle}>
         <Pendu
           gap={gap}
           seed={seed}
