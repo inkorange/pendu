@@ -519,51 +519,63 @@ export function localCompact(
 export function expandFrames(
   frames: PlacedFrame[],
   gap: number,
-  maxScale: number = 1.0,
-  passes: number = 3,
+  maxScale: number = 2.0,
+  passes: number = 5,
 ): PlacedFrame[] {
   const result = frames.map((f) => ({ ...f }));
 
   for (let pass = 0; pass < passes; pass++) {
+    let anyGrew = false;
+
     for (let i = 0; i < result.length; i++) {
       const frame = result[i];
       const aspect = frame.width / frame.height;
       const others = result.filter((_, j) => j !== i);
+      const origW = frame.width;
+      const origH = frame.height;
 
-      // Try progressively larger sizes (10% increments)
-      let bestW = frame.width;
-      let bestH = frame.height;
-      let bestScale = frame.scale;
+      // Binary search for the max growth factor that fits
+      let lo = 1.0;
+      let hi = maxScale / frame.scale;
+      if (hi <= 1.01) continue;
 
-      for (let growth = 1.1; growth <= 1.5; growth += 0.1) {
-        const newW = frame.width * growth;
-        const newH = newW / aspect;
-        const newScale = frame.scale * growth;
-        if (newScale > maxScale) break;
+      // Test upper bound first — if it fits, take it
+      const maxW = origW * hi;
+      const maxH = maxW / aspect;
+      const maxX = frame.x - (maxW - origW) / 2;
+      const maxY = frame.y - (maxH - origH) / 2;
+      if (fitsWithoutOverlap({ x: maxX, y: maxY, width: maxW, height: maxH }, others, gap)) {
+        result[i] = { ...result[i], x: maxX, y: maxY, width: maxW, height: maxH, scale: frame.scale * hi };
+        anyGrew = true;
+        continue;
+      }
 
-        // Keep the frame centered at its current position
-        const newX = frame.x - (newW - frame.width) / 2;
-        const newY = frame.y - (newH - frame.height) / 2;
+      // Binary search for the largest growth that fits
+      for (let step = 0; step < 8; step++) {
+        const mid = (lo + hi) / 2;
+        const w = origW * mid;
+        const h = w / aspect;
+        const x = frame.x - (w - origW) / 2;
+        const y = frame.y - (h - origH) / 2;
 
-        const candidate = { x: newX, y: newY, width: newW, height: newH };
-        if (fitsWithoutOverlap(candidate, others, gap)) {
-          bestW = newW;
-          bestH = newH;
-          bestScale = newScale;
-          // Update position to stay centered
-          result[i] = {
-            ...result[i],
-            x: newX,
-            y: newY,
-            width: bestW,
-            height: bestH,
-            scale: bestScale,
-          };
+        if (fitsWithoutOverlap({ x, y, width: w, height: h }, others, gap)) {
+          lo = mid;
         } else {
-          break; // Can't grow further
+          hi = mid;
         }
       }
+
+      if (lo > 1.02) {
+        const finalW = origW * lo;
+        const finalH = finalW / aspect;
+        const finalX = frame.x - (finalW - origW) / 2;
+        const finalY = frame.y - (finalH - origH) / 2;
+        result[i] = { ...result[i], x: finalX, y: finalY, width: finalW, height: finalH, scale: frame.scale * lo };
+        anyGrew = true;
+      }
     }
+
+    if (!anyGrew) break;
   }
 
   return result;

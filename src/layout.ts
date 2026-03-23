@@ -26,7 +26,6 @@ export function computeLayout(
   const opts = resolveOptions(options);
   const prng = createPRNG(opts.seed);
 
-  // Edge case: no images
   if (images.length === 0) {
     return {
       frames: [],
@@ -35,13 +34,15 @@ export function computeLayout(
     };
   }
 
-  const centerX = opts.containerWidth / 2;
-  const centerY = opts.containerHeight / 2;
+  const cw = opts.containerWidth;
+  const ch = opts.containerHeight;
+  const centerX = cw / 2;
+  const centerY = ch / 2;
   const placed: PlacedFrame[] = [];
   let failed = 0;
 
   // Place first frame at center
-  const firstBase = computeBaseSize(images[0], opts.containerWidth, opts.containerHeight, images.length);
+  const firstBase = computeBaseSize(images[0], cw, ch, images.length);
   placed.push({
     width: firstBase.width,
     height: firstBase.height,
@@ -50,12 +51,12 @@ export function computeLayout(
     scale: 1.0,
   });
 
-  // Scale factors to try (prefer larger)
   const scaleSteps = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, opts.minScale];
 
-  // Place remaining frames
+  // Place remaining frames — prefer positions that stay within the
+  // container bounds and fill empty space
   for (let i = 1; i < images.length; i++) {
-    const base = computeBaseSize(images[i], opts.containerWidth, opts.containerHeight, images.length);
+    const base = computeBaseSize(images[i], cw, ch, images.length);
     let bestCandidate: PlacedFrame | null = null;
     let bestScore = -Infinity;
 
@@ -69,23 +70,22 @@ export function computeLayout(
       for (const c of candidates) {
         if (!fitsWithoutOverlap(c, placed, opts.gap)) continue;
 
-        let score = scorePosition(c, placed, centerX, centerY, opts.gap, prng(), opts.containerWidth, opts.containerHeight);
+        let score = scorePosition(
+          c, placed, centerX, centerY, opts.gap, prng(), cw, ch,
+        );
 
-        // Soft penalty for exceeding container — allow up to 120% before
-        // penalizing, since scale3d handles the visual fit. This lets the
-        // cluster use more of the available space.
-        if (placed.length >= 4) {
-          const allFrames = [...placed, c];
-          let clusterMinX = Infinity, clusterMaxX = -Infinity;
-          for (const f of allFrames) {
-            if (f.x < clusterMinX) clusterMinX = f.x;
-            if (f.x + f.width > clusterMaxX) clusterMaxX = f.x + f.width;
-          }
-          const projectedWidth = clusterMaxX - clusterMinX;
-          const threshold = opts.containerWidth * 1.2;
-          if (projectedWidth > threshold) {
-            score -= (projectedWidth - threshold) * 1.5;
-          }
+        // Strongly reward candidates that stay within container bounds
+        const inBoundsX = c.x >= 0 && c.x + c.width <= cw;
+        const inBoundsY = c.y >= 0 && c.y + c.height <= ch;
+        if (inBoundsX && inBoundsY) {
+          score += 200;
+        } else {
+          // Penalize based on how far outside the bounds
+          const overLeft = Math.max(0, -c.x);
+          const overRight = Math.max(0, c.x + c.width - cw);
+          const overTop = Math.max(0, -c.y);
+          const overBottom = Math.max(0, c.y + c.height - ch);
+          score -= (overLeft + overRight + overTop + overBottom) * 3;
         }
 
         if (score > bestScore) {
@@ -100,13 +100,7 @@ export function computeLayout(
         }
       }
 
-      // If we found a valid position at this scale, stop trying smaller
-      if (bestCandidate !== null && scale === scaleSteps[scaleSteps.indexOf(scale)]) {
-        // Check if we found any candidates at THIS scale level
-        // We want to try all candidates at the current scale before moving to smaller
-        // Since we iterate all candidates above, if bestCandidate is set we can break
-        break;
-      }
+      if (bestCandidate !== null) break;
     }
 
     if (bestCandidate) {
@@ -116,12 +110,12 @@ export function computeLayout(
     }
   }
 
-  // Compaction passes
+  // Compaction — pull toward center but respect container shape
   let frames = compactToCenter(placed, centerX, centerY, opts.gap, 15);
   frames = fillInteriorGaps(frames, centerX, centerY, opts.gap, 5);
 
-  // Expansion pass — grow frames to fill available space around them
-  frames = expandFrames(frames, opts.gap, 1.0, 3);
+  // Expansion — grow frames to fill available space
+  frames = expandFrames(frames, opts.gap, 1.5, 5);
 
   // Re-center the cluster within the container
   if (frames.length > 0) {
@@ -130,7 +124,6 @@ export function computeLayout(
     const clusterCY = postBounds.minY + postBounds.height / 2;
     const offsetX = centerX - clusterCX;
     const offsetY = centerY - clusterCY;
-
     frames = frames.map((f) => ({ ...f, x: f.x + offsetX, y: f.y + offsetY }));
   }
 
@@ -151,12 +144,10 @@ export function addToLayout(
   options?: LayoutOptions,
 ): LayoutResult {
   const opts = resolveOptions(options);
-  // Use existing frame count as entropy so repeated adds differ
   const prng = createPRNG(opts.seed + existing.frames.length);
   const frames = existing.frames.map((f) => ({ ...f }));
 
   if (frames.length === 0) {
-    // No existing frames — just place at center
     return computeLayout([newImage], options);
   }
 
@@ -181,7 +172,9 @@ export function addToLayout(
     for (const c of candidates) {
       if (!fitsWithoutOverlap(c, frames, opts.gap)) continue;
 
-      const score = scorePosition(c, frames, centerX, centerY, opts.gap, prng(), opts.containerWidth, opts.containerHeight);
+      const score = scorePosition(
+        c, frames, centerX, centerY, opts.gap, prng(), opts.containerWidth, opts.containerHeight,
+      );
       if (score > bestScore) {
         bestScore = score;
         bestCandidate = {
@@ -210,7 +203,6 @@ export function addToLayout(
 
   frames.push(bestCandidate);
 
-  // Light compaction pass (gentle — don't move existing frames much)
   const compacted = compactToCenter(frames, centerX, centerY, opts.gap, 3);
 
   return {
