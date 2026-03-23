@@ -133,15 +133,17 @@ function PenduComponent({
   const layout: LayoutResult | null = useMemo(() => {
     if (containerWidth === 0 || childItems.length === 0) return null;
 
+    // Layout computes against the available width inside padding
+    const availableWidth = containerWidth - padding * 2;
     return computeLayout(
       childItems.map((c) => c.imageData),
       {
         gap,
         minScale,
-        padding,
+        padding: 0, // padding is handled by the component, not the algorithm
         seed: effectiveSeed,
-        containerWidth,
-        containerHeight: containerWidth, // square initial, height auto-computed
+        containerWidth: availableWidth,
+        containerHeight: availableWidth, // square initial, height auto-computed
       },
     );
     // layoutKey captures all dependencies in a stable string
@@ -230,7 +232,6 @@ function PenduComponent({
     width: '100%',
     height: containerHeight > 0 ? containerHeight : 'auto',
     background: 'var(--pendu-bg)',
-    padding: `var(--pendu-padding)`,
     ...style,
   } as React.CSSProperties;
 
@@ -246,10 +247,11 @@ function PenduComponent({
           if (!frame) return null;
 
           // Position relative to layout bounds (normalize to 0,0 origin)
+          // Offset by padding so frames sit inside the container's padded area
           const frameStyle: React.CSSProperties = {
             position: 'absolute',
-            left: frame.x - layout.bounds.minX,
-            top: frame.y - layout.bounds.minY,
+            left: frame.x - layout.bounds.minX + padding,
+            top: frame.y - layout.bounds.minY + padding,
             width: frame.width,
             height: frame.height,
           };
