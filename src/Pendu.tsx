@@ -9,8 +9,10 @@ import React, {
 } from 'react';
 import { computeLayout } from './layout';
 import { PenduImage } from './PenduImage';
+import { PenduItem } from './PenduItem';
 import type { PenduImageData, LayoutResult } from './types';
 import type { PenduImageProps } from './PenduImage';
+import type { PenduItemProps } from './PenduItem';
 
 // ---------------------------------------------------------------------------
 // CSS variable defaults
@@ -47,7 +49,8 @@ export interface PenduProps {
 
 interface ChildImageData {
   key: string;
-  props: PenduImageProps;
+  type: 'image' | 'item';
+  props: PenduImageProps | PenduItemProps;
   imageData: PenduImageData;
 }
 
@@ -66,14 +69,26 @@ function extractChildren(children: React.ReactNode): ChildImageData[] {
   const result: ChildImageData[] = [];
   React.Children.forEach(children, (child, index) => {
     if (!React.isValidElement(child)) return;
-    if (child.type !== PenduImage) return;
 
-    const props = child.props as PenduImageProps;
-    result.push({
-      key: (child.key != null ? String(child.key) : String(index)),
-      props,
-      imageData: { width: props.width, height: props.height },
-    });
+    const key = child.key != null ? String(child.key) : String(index);
+
+    if (child.type === PenduImage) {
+      const props = child.props as PenduImageProps;
+      result.push({
+        key,
+        type: 'image',
+        props,
+        imageData: { width: props.width, height: props.height },
+      });
+    } else if (child.type === PenduItem) {
+      const props = child.props as PenduItemProps;
+      result.push({
+        key,
+        type: 'item',
+        props,
+        imageData: { width: props.width, height: props.height },
+      });
+    }
   });
   return result;
 }
@@ -405,10 +420,21 @@ function PenduComponent({
               height: frame.height,
             };
 
+            if (child.type === 'item') {
+              return (
+                <PenduItem
+                  key={child.key}
+                  {...(child.props as PenduItemProps)}
+                  _frameStyle={frameStyle}
+                  _penduKey={child.key}
+                />
+              );
+            }
+
             return (
               <PenduImage
                 key={child.key}
-                {...child.props}
+                {...(child.props as PenduImageProps)}
                 _frameStyle={frameStyle}
                 _penduKey={child.key}
               />
@@ -426,9 +452,11 @@ function PenduComponent({
 
 type PenduType = typeof PenduComponent & {
   Image: typeof PenduImage;
+  Item: typeof PenduItem;
 };
 
 const Pendu = PenduComponent as PenduType;
 Pendu.Image = PenduImage;
+Pendu.Item = PenduItem;
 
 export { Pendu };

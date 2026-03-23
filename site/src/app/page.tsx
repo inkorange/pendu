@@ -2,6 +2,7 @@ import { Nav } from "@/components/Nav";
 import { HeroGallery } from "@/components/HeroGallery";
 import { CodeBlock } from "@/components/CodeBlock";
 import Link from "next/link";
+import Image from "next/image";
 
 const installCode = `npm install @inkorange/pendu`;
 
@@ -82,12 +83,15 @@ export default function Home() {
       <Nav />
       <main className="pt-14">
         {/* Hero */}
-        <section className="max-w-6xl mx-auto px-6 pt-20 pb-16">
+        <section className="max-w-6xl mx-auto px-6 pt-20 pb-16 relative">
+          <div className="hero-glow" />
           <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold tracking-tight mb-4">
+            <div className="flex justify-center mb-6">
+              <Image src="/pendu.png" alt="Pendu" width={280} height={100} priority />
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight mb-4">
               Organic gallery layouts
-              <br />
-              <span className="text-[var(--accent)]">for React</span>
+              {" "}<span className="text-[var(--accent)]">for React</span>
             </h1>
             <p className="text-lg text-[var(--text-muted)] max-w-2xl mx-auto mb-8">
               A lightweight component that arranges images into beautiful,
