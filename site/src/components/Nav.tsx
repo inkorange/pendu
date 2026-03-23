@@ -1,11 +1,12 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export function Nav() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur-md">
       <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link href="/" className="font-semibold text-lg tracking-tight">
-          pendu
+        <Link href="/" className="flex items-center">
+          <Image src="/pendu.png" alt="Pendu" width={80} height={28} priority />
         </Link>
         <div className="flex items-center gap-6 text-sm">
           <Link

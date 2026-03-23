@@ -1,6 +1,7 @@
 export { Pendu } from './Pendu';
 export type { PenduProps } from './Pendu';
 export type { PenduImageProps } from './PenduImage';
+export type { PenduItemProps } from './PenduItem';
 export { computeLayout, addToLayout, removeFromLayout } from './layout';
 export type {
   PenduImageData,

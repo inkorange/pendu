@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pendu } from "@inkorange/pendu";
 import { Nav } from "@/components/Nav";
+import { CodeBlock } from "@/components/CodeBlock";
 
 const allImages = [
   { id: "l1", src: "/demo/landscape-1.jpg", width: 1200, height: 800, alt: "Landscape 1" },
@@ -214,9 +215,7 @@ function MyGallery() {
                 <h3 className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-wider mb-3">
                   Generated Code
                 </h3>
-                <pre className="p-4 bg-[var(--bg-code)] rounded-lg border border-[var(--border)] overflow-x-auto text-sm leading-relaxed">
-                  <code>{generatedCode}</code>
-                </pre>
+                <CodeBlock code={generatedCode} language="tsx" filename="MyGallery.tsx" />
               </div>
             </div>
           </div>
