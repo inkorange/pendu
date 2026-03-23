@@ -47,18 +47,26 @@ export function computeBaseSize(
   image: PenduImageData,
   containerWidth: number,
   containerHeight: number,
+  totalImages: number = 1,
 ): { width: number; height: number } {
   const aspect = image.width / image.height;
+
+  // Scale the grid divisor based on image count so more images use
+  // more columns/rows, filling the available space instead of stacking.
+  // Target roughly sqrt(N) columns for a square-ish grid.
+  const cols = Math.max(2, Math.ceil(Math.sqrt(totalImages)));
+  const rows = Math.max(2, Math.ceil(totalImages / cols));
+
   let w: number;
   let h: number;
 
   if (aspect >= 1) {
-    // Landscape or square
-    w = containerWidth / 3;
+    // Landscape or square — size relative to columns
+    w = containerWidth / cols;
     h = w / aspect;
   } else {
-    // Portrait
-    h = containerHeight / 3;
+    // Portrait — size relative to rows
+    h = containerHeight / rows;
     w = h * aspect;
   }
 
