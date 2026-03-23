@@ -133,15 +133,17 @@ function PenduComponent({
   const layout: LayoutResult | null = useMemo(() => {
     if (containerWidth === 0 || childItems.length === 0) return null;
 
+    // Layout computes against the available width inside padding
+    const availableWidth = containerWidth - padding * 2;
     return computeLayout(
       childItems.map((c) => c.imageData),
       {
         gap,
         minScale,
-        padding,
+        padding: 0, // padding is handled by the component, not the algorithm
         seed: effectiveSeed,
-        containerWidth,
-        containerHeight: containerWidth, // square initial, height auto-computed
+        containerWidth: availableWidth,
+        containerHeight: availableWidth, // square initial, height auto-computed
       },
     );
     // layoutKey captures all dependencies in a stable string
@@ -219,7 +221,16 @@ function PenduComponent({
   // Render
   // ---------------------------------------------------------------------------
 
-  const containerHeight = layout ? layout.bounds.height + padding * 2 : 0;
+  const availableWidth = containerWidth - padding * 2;
+  const layoutWidth = layout ? layout.bounds.width : 0;
+  const layoutHeight = layout ? layout.bounds.height : 0;
+
+  // Scale the entire layout to fit within the container if it overflows
+  const fitScale = layoutWidth > availableWidth ? availableWidth / layoutWidth : 1;
+  const scaledLayoutWidth = layoutWidth * fitScale;
+  const scaledLayoutHeight = layoutHeight * fitScale;
+  const horizontalOffset = (availableWidth - scaledLayoutWidth) / 2;
+  const containerHeight = layout ? scaledLayoutHeight + padding * 2 : 0;
 
   const rootStyle: React.CSSProperties = {
     ...CSS_VAR_DEFAULTS,
@@ -230,9 +241,20 @@ function PenduComponent({
     width: '100%',
     height: containerHeight > 0 ? containerHeight : 'auto',
     background: 'var(--pendu-bg)',
-    padding: `var(--pendu-padding)`,
+    overflow: 'hidden' as const,
     ...style,
   } as React.CSSProperties;
+
+  // Inner wrapper uses scale3d for GPU-accelerated fitting
+  const innerStyle: React.CSSProperties = {
+    position: 'absolute' as const,
+    left: padding + horizontalOffset,
+    top: padding,
+    width: layoutWidth,
+    height: layoutHeight,
+    transform: fitScale < 1 ? `scale3d(${fitScale}, ${fitScale}, 1)` : undefined,
+    transformOrigin: 'top left',
+  };
 
   return (
     <div
@@ -240,29 +262,31 @@ function PenduComponent({
       className={['pendu', className].filter(Boolean).join(' ')}
       style={rootStyle}
     >
-      {layout &&
-        childItems.map((child, index) => {
-          const frame = layout.frames[index];
-          if (!frame) return null;
+      {layout && (
+        <div style={innerStyle}>
+          {childItems.map((child, index) => {
+            const frame = layout.frames[index];
+            if (!frame) return null;
 
-          // Position relative to layout bounds (normalize to 0,0 origin)
-          const frameStyle: React.CSSProperties = {
-            position: 'absolute',
-            left: frame.x - layout.bounds.minX,
-            top: frame.y - layout.bounds.minY,
-            width: frame.width,
-            height: frame.height,
-          };
+            const frameStyle: React.CSSProperties = {
+              position: 'absolute',
+              left: frame.x - layout.bounds.minX,
+              top: frame.y - layout.bounds.minY,
+              width: frame.width,
+              height: frame.height,
+            };
 
-          return React.cloneElement(
-            <PenduImage
-              key={child.key}
-              {...child.props}
-              _frameStyle={frameStyle}
-            />,
-            { 'data-pendu-key': child.key } as Record<string, string>,
-          );
-        })}
+            return React.cloneElement(
+              <PenduImage
+                key={child.key}
+                {...child.props}
+                _frameStyle={frameStyle}
+              />,
+              { 'data-pendu-key': child.key } as Record<string, string>,
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
