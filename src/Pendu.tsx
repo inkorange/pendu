@@ -13,7 +13,7 @@ import type { PenduImageData, LayoutResult } from './types';
 import type { PenduImageProps } from './PenduImage';
 
 // ---------------------------------------------------------------------------
-// CSS variable defaults (inline — no SCSS import at runtime)
+// CSS variable defaults
 // ---------------------------------------------------------------------------
 
 const CSS_VAR_DEFAULTS: Record<string, string> = {
@@ -101,11 +101,11 @@ function PenduComponent({
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const seedRef = useRef<number>(seed ?? Math.floor(Math.random() * 0x100000000));
-  const [containerWidth, setContainerWidth] = useState<number>(0);
-  const [containerMeasuredHeight, setContainerMeasuredHeight] = useState<number>(0);
-  const hasFixedHeight = useRef(false);
 
-  // Track previous frame positions for FLIP (keyed by child key)
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [maxHeight, setMaxHeight] = useState<number>(0); // 0 = unconstrained
+
+  // FLIP animation state
   const prevSnapshotsRef = useRef<Map<string, FrameSnapshot>>(new Map());
   const prevKeysRef = useRef<Set<string>>(new Set());
   const isFirstRenderRef = useRef(true);
@@ -113,48 +113,65 @@ function PenduComponent({
   const effectiveSeed = seed ?? seedRef.current;
 
   // ---------------------------------------------------------------------------
-  // ResizeObserver — track both width and height
+  // Measure container width + detect height constraint from parent
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-
     const parentEl = el.parentElement;
 
-    // Observe the Pendu element for width changes
-    const observer = new ResizeObserver((entries) => {
+    // Observe Pendu element for width
+    const selfObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const width = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
-        setContainerWidth(Math.round(width));
+        const w = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+        setContainerWidth(Math.round(w));
       }
     });
-    observer.observe(el);
+    selfObserver.observe(el);
 
-    // Observe the PARENT element for height constraints
-    // This avoids feedback loops — the parent's height is the input constraint,
-    // the Pendu element's height is the output.
+    // Observe parent for height constraints
+    // We temporarily set Pendu to height:0 to measure what height the parent
+    // *actually* gives us — if it's > 0, the parent has a fixed height.
+    // But that's destructive. Instead, we check if the parent's height is
+    // independent of our content by comparing parent height when we have
+    // min-height:0 vs our computed height.
+    //
+    // Simpler approach: just read the parent's height. If the parent has
+    // overflow:hidden or an explicit height that doesn't change with our
+    // content, use it as a max constraint.
     let parentObserver: ResizeObserver | null = null;
     if (parentEl) {
       parentObserver = new ResizeObserver(() => {
-        const parentStyle = getComputedStyle(parentEl);
-        const parentOverflow = parentStyle.overflow || parentStyle.overflowY;
-        const hasExplicitHeight = parentEl.style.height !== '' && parentEl.style.height !== 'auto';
-        const hasOverflowClip = parentOverflow === 'hidden' || parentOverflow === 'scroll' || parentOverflow === 'auto';
-        hasFixedHeight.current = hasExplicitHeight || hasOverflowClip;
+        // Read the parent's available height
+        const ph = parentEl.clientHeight;
 
-        if (hasFixedHeight.current) {
-          // Use parent's clientHeight as the available height constraint
-          setContainerMeasuredHeight(parentEl.clientHeight);
+        // Check if parent constrains height:
+        // - Has overflow hidden/scroll/auto, OR
+        // - Has an explicit CSS height (inline style, or resolved from class)
+        //
+        // We detect this by temporarily making ourselves 0-height and seeing
+        // if the parent keeps its size (= constrained) or also goes to 0 (= auto)
+        const prevMinH = el.style.minHeight;
+        const prevH = el.style.height;
+        el.style.minHeight = '0';
+        el.style.height = '0';
+        const parentHeightWhenEmpty = parentEl.clientHeight;
+        el.style.minHeight = prevMinH;
+        el.style.height = prevH;
+
+        if (parentHeightWhenEmpty > 0) {
+          // Parent has a fixed height independent of our content
+          setMaxHeight(parentHeightWhenEmpty);
         } else {
-          setContainerMeasuredHeight(0);
+          setMaxHeight(0); // unconstrained
         }
       });
       parentObserver.observe(parentEl);
     }
 
     return () => {
-      observer.disconnect();
+      selfObserver.disconnect();
       parentObserver?.disconnect();
     };
   }, []);
@@ -189,42 +206,44 @@ function PenduComponent({
   }, [layoutKey, containerWidth]);
 
   // ---------------------------------------------------------------------------
-  // Compute rendered positions (normalized + centered)
+  // Compute fit scale (both axes)
   // ---------------------------------------------------------------------------
 
   const availableWidth = containerWidth - padding * 2;
   const layoutWidth = layout ? layout.bounds.width : 0;
   const layoutHeight = layout ? layout.bounds.height : 0;
 
-  // Scale to fit both width AND height constraints
   let fitScale = 1;
-  if (layoutWidth > 0) {
-    const widthScale = layoutWidth > availableWidth ? availableWidth / layoutWidth : 1;
-    fitScale = widthScale;
+
+  // Scale to fit width
+  if (layoutWidth > availableWidth && availableWidth > 0) {
+    fitScale = availableWidth / layoutWidth;
   }
 
-  // If parent has a fixed/constrained height, also scale to fit vertically
-  if (hasFixedHeight.current && containerMeasuredHeight > 0 && layoutHeight > 0) {
-    const availableHeight = containerMeasuredHeight - padding * 2;
-    if (layoutHeight * fitScale > availableHeight) {
-      const heightScale = availableHeight / layoutHeight;
-      fitScale = Math.min(fitScale, heightScale);
+  // Scale to fit height (if constrained)
+  if (maxHeight > 0 && layoutHeight > 0) {
+    const availableHeight = maxHeight - padding * 2;
+    if (availableHeight > 0 && layoutHeight * fitScale > availableHeight) {
+      fitScale = Math.min(fitScale, availableHeight / layoutHeight);
     }
   }
 
-  const scaledLayoutHeight = layoutHeight * fitScale;
   const scaledLayoutWidth = layoutWidth * fitScale;
+  const scaledLayoutHeight = layoutHeight * fitScale;
   const horizontalOffset = (availableWidth - scaledLayoutWidth) / 2;
-
-  // When parent has fixed height, use that; otherwise auto-size to content
-  const verticalOffset = hasFixedHeight.current && containerMeasuredHeight > 0
-    ? ((containerMeasuredHeight - padding * 2) - scaledLayoutHeight) / 2
-    : 0;
-  const containerHeight = layout
-    ? (hasFixedHeight.current ? containerMeasuredHeight : scaledLayoutHeight + padding * 2)
+  const verticalOffset = maxHeight > 0
+    ? ((maxHeight - padding * 2) - scaledLayoutHeight) / 2
     : 0;
 
-  // Build a map of key → rendered position for the current layout
+  // Auto height when unconstrained; fill parent when constrained
+  const outputHeight = layout
+    ? (maxHeight > 0 ? maxHeight : scaledLayoutHeight + padding * 2)
+    : (maxHeight > 0 ? maxHeight : 'auto');
+
+  // ---------------------------------------------------------------------------
+  // Build snapshot map for FLIP
+  // ---------------------------------------------------------------------------
+
   const currentSnapshots = useMemo(() => {
     const map = new Map<string, FrameSnapshot>();
     if (!layout) return map;
@@ -258,7 +277,6 @@ function PenduComponent({
     isFirstRenderRef.current = false;
 
     if (!shouldAnimate || !layout) {
-      // Still update snapshots even if not animating
       prevSnapshotsRef.current = new Map(currentSnapshots);
       prevKeysRef.current = new Set(childItems.map((c) => c.key));
       return;
@@ -271,7 +289,7 @@ function PenduComponent({
     const currentKeys = new Set(childItems.map((c) => c.key));
     const prevKeys = prevKeysRef.current;
     const prevSnapshots = prevSnapshotsRef.current;
-    const easing = `cubic-bezier(0.25, 0.1, 0.25, 1)`;
+    const easing = 'cubic-bezier(0.25, 0.1, 0.25, 1)';
 
     frameEls.forEach((el) => {
       const key = el.dataset.penduKey;
@@ -283,97 +301,51 @@ function PenduComponent({
       const prev = prevSnapshots.get(key);
 
       if (!prev || !prevKeys.has(key)) {
-        // ENTER — new frame, scale and fade in
+        // ENTER
         el.style.transition = 'none';
         el.style.transform = 'scale(0.7)';
         el.style.opacity = '0';
-
-        // Force style recalc before adding transition
         void el.offsetHeight;
-
         el.style.transition = `transform ${animationDuration}ms ${easing}, opacity ${animationDuration}ms ${easing}`;
         el.style.transform = 'scale(1)';
         el.style.opacity = '1';
-
-        // Clean up inline styles after animation
-        const cleanup = () => {
-          el.style.removeProperty('transition');
-          el.style.removeProperty('transform');
-          el.style.removeProperty('opacity');
-          el.removeEventListener('transitionend', cleanup);
-        };
+        const cleanup = () => { el.style.removeProperty('transition'); el.style.removeProperty('transform'); el.style.removeProperty('opacity'); el.removeEventListener('transitionend', cleanup); };
         el.addEventListener('transitionend', cleanup, { once: true });
         return;
       }
 
-      // MOVE — animate from old position to new
+      // MOVE
       const dx = prev.left - curr.left;
       const dy = prev.top - curr.top;
-
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
 
-      // Apply inverse transform (FLIP: Invert)
       el.style.transition = 'none';
       el.style.transform = `translate(${dx}px, ${dy}px)`;
-
-      // Force style recalc
       void el.offsetHeight;
-
-      // Animate to final position (FLIP: Play)
       el.style.transition = `transform ${animationDuration}ms ${easing}`;
       el.style.transform = 'translate(0, 0)';
-
-      const cleanup = () => {
-        el.style.removeProperty('transition');
-        el.style.removeProperty('transform');
-        el.removeEventListener('transitionend', cleanup);
-      };
+      const cleanup = () => { el.style.removeProperty('transition'); el.style.removeProperty('transform'); el.removeEventListener('transitionend', cleanup); };
       el.addEventListener('transitionend', cleanup, { once: true });
     });
 
-    // EXIT — animate removed frames
-    // For each key that was in prevKeys but not in currentKeys, create a ghost element
+    // EXIT — ghost elements for removed frames
     prevKeys.forEach((key) => {
       if (currentKeys.has(key)) return;
-
       const prev = prevSnapshots.get(key);
       if (!prev || !inner) return;
 
-      // Create a ghost element at the old position
       const ghost = document.createElement('div');
       ghost.className = 'pendu-frame pendu-frame--exiting';
-      ghost.style.position = 'absolute';
-      ghost.style.left = `${prev.left}px`;
-      ghost.style.top = `${prev.top}px`;
-      ghost.style.width = `${prev.width}px`;
-      ghost.style.height = `${prev.height}px`;
-      ghost.style.background = 'var(--pendu-skeleton-bg, #e0e0e0)';
-      ghost.style.borderRadius = 'var(--pendu-frame-radius, 0)';
-      ghost.style.boxShadow = 'var(--pendu-frame-shadow, none)';
-      ghost.style.overflow = 'hidden';
-      ghost.style.pointerEvents = 'none';
-      ghost.style.transition = 'none';
-      ghost.style.opacity = '1';
-      ghost.style.transform = 'scale(1)';
-
+      ghost.style.cssText = `position:absolute;left:${prev.left}px;top:${prev.top}px;width:${prev.width}px;height:${prev.height}px;background:var(--pendu-skeleton-bg,#e0e0e0);border-radius:var(--pendu-frame-radius,0);box-shadow:var(--pendu-frame-shadow,none);overflow:hidden;pointer-events:none;opacity:1;transform:scale(1);transition:none;`;
       inner.appendChild(ghost);
-
-      // Force recalc
       void ghost.offsetHeight;
-
       ghost.style.transition = `transform ${animationDuration}ms ${easing}, opacity ${animationDuration}ms ${easing}`;
       ghost.style.transform = 'scale(0.7)';
       ghost.style.opacity = '0';
-
-      ghost.addEventListener('transitionend', () => {
-        ghost.remove();
-      }, { once: true });
-
-      // Safety cleanup in case transitionend doesn't fire
+      ghost.addEventListener('transitionend', () => ghost.remove(), { once: true });
       setTimeout(() => ghost.remove(), animationDuration + 50);
     });
 
-    // Update refs for next render
     prevSnapshotsRef.current = new Map(currentSnapshots);
     prevKeysRef.current = currentKeys;
   }, [layout, animate, animationDuration, childItems, currentSnapshots]);
@@ -389,8 +361,7 @@ function PenduComponent({
     '--pendu-transition-duration': `${animationDuration}ms`,
     position: 'relative' as const,
     width: '100%',
-    // Only set height when parent doesn't constrain it (auto-size to content)
-    ...(hasFixedHeight.current ? {} : { height: containerHeight > 0 ? containerHeight : 'auto' }),
+    height: outputHeight,
     background: 'var(--pendu-bg)',
     overflow: 'hidden' as const,
     ...style,
