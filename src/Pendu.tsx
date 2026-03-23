@@ -221,6 +221,9 @@ function PenduComponent({
   // Render
   // ---------------------------------------------------------------------------
 
+  const availableWidth = containerWidth - padding * 2;
+  const layoutWidth = layout ? layout.bounds.width : 0;
+  const horizontalOffset = layout ? (availableWidth - layoutWidth) / 2 : 0;
   const containerHeight = layout ? layout.bounds.height + padding * 2 : 0;
 
   const rootStyle: React.CSSProperties = {
@@ -250,7 +253,7 @@ function PenduComponent({
           // Offset by padding so frames sit inside the container's padded area
           const frameStyle: React.CSSProperties = {
             position: 'absolute',
-            left: frame.x - layout.bounds.minX + padding,
+            left: frame.x - layout.bounds.minX + padding + horizontalOffset,
             top: frame.y - layout.bounds.minY + padding,
             width: frame.width,
             height: frame.height,
