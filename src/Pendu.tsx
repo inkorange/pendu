@@ -6,11 +6,10 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
-  useCallback,
 } from 'react';
 import { computeLayout } from './layout';
 import { PenduImage } from './PenduImage';
-import type { PenduImageData, LayoutResult, PlacedFrame } from './types';
+import type { PenduImageData, LayoutResult } from './types';
 import type { PenduImageProps } from './PenduImage';
 
 // ---------------------------------------------------------------------------
@@ -46,15 +45,22 @@ export interface PenduProps {
   children: React.ReactNode;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 interface ChildImageData {
   key: string;
   props: PenduImageProps;
   imageData: PenduImageData;
 }
+
+interface FrameSnapshot {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function extractChildren(children: React.ReactNode): ChildImageData[] {
   const result: ChildImageData[] = [];
@@ -93,15 +99,19 @@ function PenduComponent({
   children,
 }: PenduProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const seedRef = useRef<number>(seed ?? Math.floor(Math.random() * 0x100000000));
-  const prevPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const [containerWidth, setContainerWidth] = useState<number>(0);
 
-  // If consumer provides a seed, use it; otherwise keep the stable random seed
+  // Track previous frame positions for FLIP (keyed by child key)
+  const prevSnapshotsRef = useRef<Map<string, FrameSnapshot>>(new Map());
+  const prevKeysRef = useRef<Set<string>>(new Set());
+  const isFirstRenderRef = useRef(true);
+
   const effectiveSeed = seed ?? seedRef.current;
 
   // ---------------------------------------------------------------------------
-  // ResizeObserver for responsive width
+  // ResizeObserver
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
@@ -133,22 +143,51 @@ function PenduComponent({
   const layout: LayoutResult | null = useMemo(() => {
     if (containerWidth === 0 || childItems.length === 0) return null;
 
-    // Layout computes against the available width inside padding
     const availableWidth = containerWidth - padding * 2;
     return computeLayout(
       childItems.map((c) => c.imageData),
       {
         gap,
         minScale,
-        padding: 0, // padding is handled by the component, not the algorithm
+        padding: 0,
         seed: effectiveSeed,
         containerWidth: availableWidth,
-        containerHeight: availableWidth, // square initial, height auto-computed
+        containerHeight: availableWidth,
       },
     );
-    // layoutKey captures all dependencies in a stable string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey, containerWidth]);
+
+  // ---------------------------------------------------------------------------
+  // Compute rendered positions (normalized + centered)
+  // ---------------------------------------------------------------------------
+
+  const availableWidth = containerWidth - padding * 2;
+  const layoutWidth = layout ? layout.bounds.width : 0;
+  const layoutHeight = layout ? layout.bounds.height : 0;
+  const fitScale = layoutWidth > availableWidth ? availableWidth / layoutWidth : 1;
+  const scaledLayoutHeight = layoutHeight * fitScale;
+  const scaledLayoutWidth = layoutWidth * fitScale;
+  const horizontalOffset = (availableWidth - scaledLayoutWidth) / 2;
+  const containerHeight = layout ? scaledLayoutHeight + padding * 2 : 0;
+
+  // Build a map of key → rendered position for the current layout
+  const currentSnapshots = useMemo(() => {
+    const map = new Map<string, FrameSnapshot>();
+    if (!layout) return map;
+
+    childItems.forEach((child, index) => {
+      const frame = layout.frames[index];
+      if (!frame) return;
+      map.set(child.key, {
+        left: frame.x - layout.bounds.minX,
+        top: frame.y - layout.bounds.minY,
+        width: frame.width,
+        height: frame.height,
+      });
+    });
+    return map;
+  }, [layout, childItems]);
 
   // ---------------------------------------------------------------------------
   // FLIP animation
@@ -162,75 +201,133 @@ function PenduComponent({
   }, []);
 
   useLayoutEffect(() => {
-    if (!animate || !layout || prefersReducedMotion.current) return;
+    const shouldAnimate = animate && !prefersReducedMotion.current && !isFirstRenderRef.current;
+    isFirstRenderRef.current = false;
 
-    const el = containerRef.current;
-    if (!el) return;
+    if (!shouldAnimate || !layout) {
+      // Still update snapshots even if not animating
+      prevSnapshotsRef.current = new Map(currentSnapshots);
+      prevKeysRef.current = new Set(childItems.map((c) => c.key));
+      return;
+    }
 
-    const frames = el.querySelectorAll<HTMLElement>('.pendu-frame');
-    frames.forEach((frameEl) => {
-      const key = frameEl.dataset.penduKey;
+    const inner = innerRef.current;
+    if (!inner) return;
+
+    const frameEls = inner.querySelectorAll<HTMLElement>('[data-pendu-key]');
+    const currentKeys = new Set(childItems.map((c) => c.key));
+    const prevKeys = prevKeysRef.current;
+    const prevSnapshots = prevSnapshotsRef.current;
+    const easing = `cubic-bezier(0.25, 0.1, 0.25, 1)`;
+
+    frameEls.forEach((el) => {
+      const key = el.dataset.penduKey;
       if (!key) return;
 
-      const prev = prevPositionsRef.current.get(key);
-      if (!prev) {
-        // Entering frame — scale in
-        frameEl.style.transform = 'scale(0.8)';
-        frameEl.style.opacity = '0';
-        requestAnimationFrame(() => {
-          frameEl.style.transition = `transform ${animationDuration}ms ease-out, opacity ${animationDuration}ms ease-out`;
-          frameEl.style.transform = 'scale(1)';
-          frameEl.style.opacity = '1';
-        });
+      const curr = currentSnapshots.get(key);
+      if (!curr) return;
+
+      const prev = prevSnapshots.get(key);
+
+      if (!prev || !prevKeys.has(key)) {
+        // ENTER — new frame, scale and fade in
+        el.style.transition = 'none';
+        el.style.transform = 'scale(0.7)';
+        el.style.opacity = '0';
+
+        // Force style recalc before adding transition
+        void el.offsetHeight;
+
+        el.style.transition = `transform ${animationDuration}ms ${easing}, opacity ${animationDuration}ms ${easing}`;
+        el.style.transform = 'scale(1)';
+        el.style.opacity = '1';
+
+        // Clean up inline styles after animation
+        const cleanup = () => {
+          el.style.removeProperty('transition');
+          el.style.removeProperty('transform');
+          el.style.removeProperty('opacity');
+          el.removeEventListener('transitionend', cleanup);
+        };
+        el.addEventListener('transitionend', cleanup, { once: true });
         return;
       }
 
-      // Moving frame — translate from old position
-      const currentX = parseFloat(frameEl.style.left) || 0;
-      const currentY = parseFloat(frameEl.style.top) || 0;
-      const dx = prev.x - currentX;
-      const dy = prev.y - currentY;
+      // MOVE — animate from old position to new
+      const dx = prev.left - curr.left;
+      const dy = prev.top - curr.top;
 
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
 
-      frameEl.style.transform = `translate(${dx}px, ${dy}px)`;
-      frameEl.style.transition = 'none';
+      // Apply inverse transform (FLIP: Invert)
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
 
-      requestAnimationFrame(() => {
-        frameEl.style.transition = `transform ${animationDuration}ms ease-out, opacity ${animationDuration}ms ease-out`;
-        frameEl.style.transform = 'translate(0, 0)';
-      });
+      // Force style recalc
+      void el.offsetHeight;
+
+      // Animate to final position (FLIP: Play)
+      el.style.transition = `transform ${animationDuration}ms ${easing}`;
+      el.style.transform = 'translate(0, 0)';
+
+      const cleanup = () => {
+        el.style.removeProperty('transition');
+        el.style.removeProperty('transform');
+        el.removeEventListener('transitionend', cleanup);
+      };
+      el.addEventListener('transitionend', cleanup, { once: true });
     });
 
-    // Store current positions for next FLIP
-    const nextPositions = new Map<string, { x: number; y: number }>();
-    if (layout) {
-      childItems.forEach((child, i) => {
-        if (layout.frames[i]) {
-          nextPositions.set(child.key, {
-            x: layout.frames[i].x,
-            y: layout.frames[i].y,
-          });
-        }
-      });
-    }
-    prevPositionsRef.current = nextPositions;
-  }, [layout, animate, animationDuration, childItems]);
+    // EXIT — animate removed frames
+    // For each key that was in prevKeys but not in currentKeys, create a ghost element
+    prevKeys.forEach((key) => {
+      if (currentKeys.has(key)) return;
+
+      const prev = prevSnapshots.get(key);
+      if (!prev || !inner) return;
+
+      // Create a ghost element at the old position
+      const ghost = document.createElement('div');
+      ghost.className = 'pendu-frame pendu-frame--exiting';
+      ghost.style.position = 'absolute';
+      ghost.style.left = `${prev.left}px`;
+      ghost.style.top = `${prev.top}px`;
+      ghost.style.width = `${prev.width}px`;
+      ghost.style.height = `${prev.height}px`;
+      ghost.style.background = 'var(--pendu-skeleton-bg, #e0e0e0)';
+      ghost.style.borderRadius = 'var(--pendu-frame-radius, 0)';
+      ghost.style.boxShadow = 'var(--pendu-frame-shadow, none)';
+      ghost.style.overflow = 'hidden';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.transition = 'none';
+      ghost.style.opacity = '1';
+      ghost.style.transform = 'scale(1)';
+
+      inner.appendChild(ghost);
+
+      // Force recalc
+      void ghost.offsetHeight;
+
+      ghost.style.transition = `transform ${animationDuration}ms ${easing}, opacity ${animationDuration}ms ${easing}`;
+      ghost.style.transform = 'scale(0.7)';
+      ghost.style.opacity = '0';
+
+      ghost.addEventListener('transitionend', () => {
+        ghost.remove();
+      }, { once: true });
+
+      // Safety cleanup in case transitionend doesn't fire
+      setTimeout(() => ghost.remove(), animationDuration + 50);
+    });
+
+    // Update refs for next render
+    prevSnapshotsRef.current = new Map(currentSnapshots);
+    prevKeysRef.current = currentKeys;
+  }, [layout, animate, animationDuration, childItems, currentSnapshots]);
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
-
-  const availableWidth = containerWidth - padding * 2;
-  const layoutWidth = layout ? layout.bounds.width : 0;
-  const layoutHeight = layout ? layout.bounds.height : 0;
-
-  // Scale the entire layout to fit within the container if it overflows
-  const fitScale = layoutWidth > availableWidth ? availableWidth / layoutWidth : 1;
-  const scaledLayoutWidth = layoutWidth * fitScale;
-  const scaledLayoutHeight = layoutHeight * fitScale;
-  const horizontalOffset = (availableWidth - scaledLayoutWidth) / 2;
-  const containerHeight = layout ? scaledLayoutHeight + padding * 2 : 0;
 
   const rootStyle: React.CSSProperties = {
     ...CSS_VAR_DEFAULTS,
@@ -245,7 +342,6 @@ function PenduComponent({
     ...style,
   } as React.CSSProperties;
 
-  // Inner wrapper uses scale3d for GPU-accelerated fitting
   const innerStyle: React.CSSProperties = {
     position: 'absolute' as const,
     left: padding + horizontalOffset,
@@ -263,7 +359,7 @@ function PenduComponent({
       style={rootStyle}
     >
       {layout && (
-        <div style={innerStyle}>
+        <div ref={innerRef} style={innerStyle}>
           {childItems.map((child, index) => {
             const frame = layout.frames[index];
             if (!frame) return null;
@@ -276,13 +372,13 @@ function PenduComponent({
               height: frame.height,
             };
 
-            return React.cloneElement(
+            return (
               <PenduImage
                 key={child.key}
                 {...child.props}
                 _frameStyle={frameStyle}
-              />,
-              { 'data-pendu-key': child.key } as Record<string, string>,
+                _penduKey={child.key}
+              />
             );
           })}
         </div>
