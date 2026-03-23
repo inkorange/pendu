@@ -1,0 +1,13 @@
+echo "🔍 Running TypeScript type checking..."
+npx tsc --noEmit || {
+  echo "❌ TypeScript errors found. Please fix them before committing."
+  exit 1
+}
+
+echo "🧪 Running unit tests..."
+npx jest --passWithNoTests || {
+  echo "❌ Tests failed. Please fix them before committing."
+  exit 1
+}
+
+echo "✅ All checks passed!"
