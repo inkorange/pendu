@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Pendu } from '../src/Pendu';
 
@@ -22,19 +22,38 @@ const ALL_IMAGES = Array.from({ length: 18 }, (_, i) => ({
 
 type SizeMode = 'dynamic' | 'px' | '%';
 
-function App() {
-  const [count, setCount] = useState(5);
-  const [seed, setSeed] = useState(42);
-  const [gap, setGap] = useState(16);
-  const [images, setImages] = useState(() => ALL_IMAGES.slice(0, 5));
+const STORAGE_KEY = 'pendu-demo-state';
 
-  // Container sizing controls
-  const [widthMode, setWidthMode] = useState<SizeMode>('dynamic');
-  const [widthPx, setWidthPx] = useState(600);
-  const [widthPct, setWidthPct] = useState(80);
-  const [heightMode, setHeightMode] = useState<SizeMode>('dynamic');
-  const [heightPx, setHeightPx] = useState(400);
-  const [heightPct, setHeightPct] = useState(60);
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveState(state: Record<string, unknown>) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+}
+
+function App() {
+  const saved = useRef(loadState()).current;
+
+  const [count, setCount] = useState(saved?.count ?? 5);
+  const [seed, setSeed] = useState(saved?.seed ?? 42);
+  const [gap, setGap] = useState(saved?.gap ?? 16);
+  const [images, setImages] = useState(() => ALL_IMAGES.slice(0, saved?.count ?? 5));
+
+  const [widthMode, setWidthMode] = useState<SizeMode>(saved?.widthMode ?? 'dynamic');
+  const [widthPx, setWidthPx] = useState(saved?.widthPx ?? 600);
+  const [widthPct, setWidthPct] = useState(saved?.widthPct ?? 80);
+  const [heightMode, setHeightMode] = useState<SizeMode>(saved?.heightMode ?? 'dynamic');
+  const [heightPx, setHeightPx] = useState(saved?.heightPx ?? 400);
+  const [heightPct, setHeightPct] = useState(saved?.heightPct ?? 60);
+
+  // Persist state on every change
+  useEffect(() => {
+    saveState({ count, seed, gap, widthMode, widthPx, widthPct, heightMode, heightPx, heightPct });
+  }, [count, seed, gap, widthMode, widthPx, widthPct, heightMode, heightPx, heightPct]);
 
   const handleCountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newCount = parseInt(e.target.value, 10);
