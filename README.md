@@ -1,37 +1,151 @@
-# @inkorange/pendu
+<p align="center">
+  <img src="resources/pendu.png" alt="Pendu" width="400" />
+</p>
 
-An organic gallery layout engine for React. Algorithmically arranges images of varying aspect ratios into tight, hand-curated collages with consistent spacing and no visible grid structure.
+<p align="center">
+  <strong>Organic gallery layouts for React.</strong><br/>
+  Arrange images and custom content into beautiful, natural collages — no grid, no masonry, just art.
+</p>
 
-> **Status:** In Development — targeting npm publish
+[![npm version](https://img.shields.io/npm/v/@inkorange/pendu)](https://www.npmjs.com/package/@inkorange/pendu)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@inkorange/pendu)](https://bundlephobia.com/package/@inkorange/pendu)
+[![license](https://img.shields.io/npm/l/@inkorange/pendu)](https://github.com/inkorange/pendu/blob/main/LICENSE)
+
+## Install
+
+```bash
+npm install @inkorange/pendu
+```
 
 ## Quick Start
 
 ```tsx
-'use client';
 import { Pendu } from '@inkorange/pendu';
 
-<Pendu gap={16}>
-  <Pendu.Image src="/photo1.jpg" width={800} height={600} alt="Sunset" />
-  <Pendu.Image src="/photo2.jpg" width={600} height={900} alt="Portrait" />
-  <Pendu.Image src="/photo3.jpg" width={1200} height={800} alt="Landscape" />
-</Pendu>
+function Gallery() {
+  return (
+    <Pendu gap={12} seed={42}>
+      <Pendu.Image src="/sunset.jpg" width={1200} height={800} alt="Sunset" />
+      <Pendu.Image src="/portrait.jpg" width={800} height={1200} alt="Portrait" />
+      <Pendu.Image src="/cityscape.jpg" width={1600} height={1000} alt="City" />
+    </Pendu>
+  );
+}
 ```
 
 ## Features
 
-- **Organic layouts** — No rows or columns; images arranged via center-out growth algorithm
-- **Compound component API** — `<Pendu>` + `<Pendu.Image>`, zero config required
-- **Dynamic add/remove** — Incremental layout updates with built-in FLIP animation
-- **CSS variable theming** — Customize via `--pendu-*` variables, no className needed
-- **Skeleton loading** — Placeholder frames while images load
-- **Responsive** — Fills parent container, reflows on resize
-- **TypeScript** — Full type safety with exported interfaces
-- **SSR ready** — `'use client'` directive for Next.js App Router / RSC
+- **Organic layouts** — No rows, columns, or grids. Images arrange into natural, gallery-wall collages that fill your container.
+- **Animated transitions** — FLIP animations smoothly move content when the gallery changes. Add, remove, or reorder — every transition feels intentional.
+- **Container aware** — Automatically adapts to any container size — fixed, percentage, or viewport units. Content scales and reflows to fill the space.
+- **Tiny footprint** — ~6 KB gzipped. Zero dependencies beyond React.
+- **CSS variable theming** — Customize gap, radius, and background via `--pendu-*` custom properties. No prop drilling needed.
+- **Deterministic seeds** — Same seed + same inputs = identical layout. Reproducible across renders, servers, and sessions.
+- **TypeScript** — Full type safety with exported interfaces.
+- **SSR ready** — Works with Next.js App Router and React Server Components.
 
-## Documentation
+## Dynamic Images
 
-- [PROJECT.md](./PROJECT.md) — Design goals, algorithm overview, component API reference
-- [IMPLEMENTATION.md](./IMPLEMENTATION.md) — Development roadmap and implementation phases
+Pendu reacts to children changes automatically. Just update your array:
+
+```tsx
+import { useState } from 'react';
+import { Pendu } from '@inkorange/pendu';
+
+function PhotoManager({ photos }) {
+  const [visible, setVisible] = useState(photos);
+
+  const remove = (id: string) => {
+    setVisible(prev => prev.filter(p => p.id !== id));
+  };
+
+  return (
+    <Pendu gap={12}>
+      {visible.map(photo => (
+        <Pendu.Image
+          key={photo.id}
+          src={photo.src}
+          width={photo.width}
+          height={photo.height}
+          alt={photo.alt}
+        />
+      ))}
+    </Pendu>
+  );
+}
+```
+
+## Custom Content with Pendu.Item
+
+Mix images with any React component. Use `Pendu.Item` for videos, cards, or custom content:
+
+```tsx
+<Pendu gap={12}>
+  <Pendu.Image src="/photo.jpg" width={1200} height={800} alt="Photo" />
+
+  <Pendu.Item width={400} height={300}>
+    <video src="/clip.mp4" autoPlay muted loop />
+  </Pendu.Item>
+
+  <Pendu.Item width={400} height={400}>
+    <div className="promo-card">
+      <h3>New Collection</h3>
+      <p>Explore the latest additions</p>
+    </div>
+  </Pendu.Item>
+</Pendu>
+```
+
+## CSS Variable Theming
+
+Style without props — set CSS custom properties on the gallery or any ancestor:
+
+```css
+.my-gallery {
+  --pendu-gap: 16px;
+  --pendu-frame-radius: 8px;
+  --pendu-bg: #1a1a1a;
+  --pendu-transition-duration: 500ms;
+  --pendu-transition-easing: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --pendu-skeleton-bg: #333;
+}
+```
+
+## API Reference
+
+### `<Pendu>` Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `gap` | `number` | `16` | Space between frames in pixels |
+| `seed` | `number` | random | Random seed for deterministic layouts |
+| `padding` | `number` | `10` | Inner padding of the gallery |
+| `animate` | `boolean` | `true` | Enable FLIP animations |
+| `animationDuration` | `number` | `300` | Animation duration in ms |
+| `className` | `string` | — | CSS class on the root element |
+
+### `<Pendu.Image>` Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `src` | `string` | required | Image source URL |
+| `width` | `number` | required | Original width (for aspect ratio) |
+| `height` | `number` | required | Original height (for aspect ratio) |
+| `alt` | `string` | `""` | Alt text for accessibility |
+
+### `<Pendu.Item>` Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | required | Desired width (for aspect ratio) |
+| `height` | `number` | required | Desired height (for aspect ratio) |
+| `children` | `ReactNode` | required | Content to render inside the frame |
+
+## Container Behavior
+
+- **Dynamic height (default):** Gallery grows vertically to fit all content. Container only needs a width.
+- **Fixed height:** When the parent has a fixed height (px, vh, %), the gallery scales to fit both dimensions.
+- **Responsive:** Pendu observes container resizes and re-layouts automatically.
 
 ## License
 

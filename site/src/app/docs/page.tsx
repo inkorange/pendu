@@ -19,6 +19,13 @@ const imagePropsTable = [
   { prop: "alt", type: "string", default: '""', description: "Alt text for accessibility" },
 ];
 
+const itemPropsTable = [
+  { prop: "width", type: "number", default: "required", description: "Desired width (for aspect ratio calculation)" },
+  { prop: "height", type: "number", default: "required", description: "Desired height (for aspect ratio calculation)" },
+  { prop: "children", type: "ReactNode", default: "required", description: "Content to render inside the frame" },
+  { prop: "className", type: "string", default: "—", description: "CSS class on the item wrapper" },
+];
+
 const cssVarsTable = [
   { variable: "--pendu-gap", default: "8px", description: "Override gap between images" },
   { variable: "--pendu-radius", default: "0", description: "Border radius on image frames" },
@@ -62,6 +69,28 @@ function PhotoManager() {
           alt={photo.alt}
         />
       ))}
+    </Pendu>
+  );
+}`;
+
+const itemExample = `import { Pendu } from '@inkorange/pendu';
+
+function MixedGallery() {
+  return (
+    <Pendu gap={12}>
+      <Pendu.Image src="/photo.jpg" width={1200} height={800} alt="Photo" />
+
+      <Pendu.Item width={400} height={300}>
+        <video src="/clip.mp4" autoPlay muted loop
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      </Pendu.Item>
+
+      <Pendu.Item width={400} height={400}>
+        <div style={{ padding: 24, background: '#1a1a2e', color: '#fff' }}>
+          <h3>New Collection</h3>
+          <p>Explore the latest additions</p>
+        </div>
+      </Pendu.Item>
     </Pendu>
   );
 }`;
@@ -149,6 +178,43 @@ export default function Docs() {
             </div>
           </section>
 
+          {/* Pendu.Item Props */}
+          <section className="mb-16">
+            <h2 className="text-2xl font-bold mb-4">
+              <code className="text-[var(--accent)]">&lt;Pendu.Item&gt;</code>{" "}
+              Props
+            </h2>
+            <p className="text-[var(--text-muted)] mb-4">
+              Use <code className="text-[var(--accent)]">&lt;Pendu.Item&gt;</code>{" "}
+              for custom content — videos, cards, CTAs, or any React component.
+              Provide <code>width</code> and <code>height</code> for aspect ratio
+              calculation; the layout engine handles sizing and positioning.
+            </p>
+            <div className="overflow-x-auto rounded-lg border border-[var(--border)] mb-6">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--bg-card)]">
+                    <th className="text-left p-3 font-medium">Prop</th>
+                    <th className="text-left p-3 font-medium">Type</th>
+                    <th className="text-left p-3 font-medium">Default</th>
+                    <th className="text-left p-3 font-medium">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemPropsTable.map((row) => (
+                    <tr key={row.prop} className="border-b border-[var(--border)]">
+                      <td className="p-3 font-mono text-[var(--accent)]">{row.prop}</td>
+                      <td className="p-3 font-mono text-xs text-[var(--text-muted)]">{row.type}</td>
+                      <td className="p-3 font-mono text-xs">{row.default}</td>
+                      <td className="p-3 text-[var(--text-muted)]">{row.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <CodeBlock code={itemExample} language="tsx" filename="MixedGallery.tsx" />
+          </section>
+
           {/* CSS Variables */}
           <section className="mb-16">
             <h2 className="text-2xl font-bold mb-4">CSS Variables</h2>
@@ -185,8 +251,9 @@ export default function Docs() {
             <p className="text-[var(--text-muted)] mb-4">
               Pendu reacts to children changes automatically. Add or remove{" "}
               <code className="text-[var(--accent)]">&lt;Pendu.Image&gt;</code>{" "}
+              or <code className="text-[var(--accent)]">&lt;Pendu.Item&gt;</code>{" "}
               elements and the gallery re-layouts with smooth FLIP animations.
-              Use stable <code>key</code> props so React can track each image.
+              Use stable <code>key</code> props so React can track each element.
             </p>
             <CodeBlock
               code={dynamicExample}

@@ -17,6 +17,33 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
 }
 
+/* Grid background */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 100% 90% at 50% 0%, black 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 100% 90% at 50% 0%, black 40%, transparent 80%);
+}
+
+/* Accent glow behind hero */
+.hero-glow {
+  position: absolute;
+  top: -250px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1200px;
+  height: 700px;
+  background: radial-gradient(ellipse, rgba(124, 58, 237, 0.18) 0%, transparent 65%);
+  pointer-events: none;
+  z-index: -1;
+}
+
 ::selection {
   background: var(--accent-dim);
   color: white;
