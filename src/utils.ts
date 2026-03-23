@@ -420,6 +420,60 @@ export function localCompact(
 }
 
 // ---------------------------------------------------------------------------
+// Overlap resolution (push apart after scaling)
+// ---------------------------------------------------------------------------
+
+export function resolveOverlaps(
+  frames: PlacedFrame[],
+  gap: number,
+  iterations: number = 20,
+): PlacedFrame[] {
+  const result = frames.map((f) => ({ ...f }));
+
+  for (let iter = 0; iter < iterations; iter++) {
+    let hasOverlap = false;
+
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        if (!rectsOverlap(result[i], result[j], gap)) continue;
+        hasOverlap = true;
+
+        const a = result[i];
+        const b = result[j];
+
+        // Calculate overlap vector between centers
+        const acx = a.x + a.width / 2;
+        const acy = a.y + a.height / 2;
+        const bcx = b.x + b.width / 2;
+        const bcy = b.y + b.height / 2;
+
+        let dx = bcx - acx;
+        let dy = bcy - acy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 0.1) {
+          // Nearly coincident — push in arbitrary direction
+          dx = 1;
+          dy = 0;
+        } else {
+          dx /= dist;
+          dy /= dist;
+        }
+
+        // Push apart by a small step
+        const step = Math.max(2, gap * 0.5);
+        result[i] = { ...result[i], x: a.x - dx * step, y: a.y - dy * step };
+        result[j] = { ...result[j], x: b.x + dx * step, y: b.y + dy * step };
+      }
+    }
+
+    if (!hasOverlap) break;
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Bounds & Stats
 // ---------------------------------------------------------------------------
 
