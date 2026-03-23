@@ -191,11 +191,12 @@ function PenduComponent({
     if (containerWidth === 0 || childItems.length === 0) return null;
 
     const availableWidth = containerWidth - padding * 2;
-    // Use actual height constraint when available, otherwise use the
-    // container width as height hint (the scale3d transform handles fit)
+    // Use actual height constraint when available. When unconstrained,
+    // use a shorter height hint (60% of width) to encourage the layout
+    // to spread horizontally rather than stacking tall.
     const availableHeight = maxHeight > 0
       ? maxHeight - padding * 2
-      : availableWidth;
+      : Math.round(availableWidth * 0.6);
 
     return computeLayout(
       childItems.map((c) => c.imageData),
