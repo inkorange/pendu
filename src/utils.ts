@@ -196,7 +196,7 @@ export function scorePosition(
   const randomWeight = Math.max(20, 80 - placed.length * 8);
 
   // Directional diversity: reward candidates that balance the cluster
-  // toward a square/diamond shape. Active at ALL frame counts.
+  // toward a square/diamond shape radiating from center.
   let diversityBonus = 0;
   {
     const candidateCX = candidate.x + candidate.width / 2;
@@ -204,7 +204,12 @@ export function scorePosition(
 
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
+    let sumX = 0, sumY = 0;
     for (const p of placed) {
+      const pcx = p.x + p.width / 2;
+      const pcy = p.y + p.height / 2;
+      sumX += pcx;
+      sumY += pcy;
       if (p.x < minX) minX = p.x;
       if (p.x + p.width > maxX) maxX = p.x + p.width;
       if (p.y < minY) minY = p.y;
@@ -215,19 +220,38 @@ export function scorePosition(
     const clusterH = maxY - minY || 1;
     const aspectRatio = clusterW / clusterH;
 
-    // Taller than wide → reward horizontal placement
-    if (aspectRatio < 0.9) {
-      const isHorizontal = candidateCX < minX || candidateCX > maxX;
-      if (isHorizontal) {
-        diversityBonus = 400 * (1 / aspectRatio);
-      }
-    }
-    // Wider than tall → reward vertical placement
-    else if (aspectRatio > 1.3) {
-      const isVertical = candidateCY < minY || candidateCY > maxY;
-      if (isVertical) {
-        diversityBonus = 400 * aspectRatio;
-      }
+    // Compute cluster centroid — candidates on the opposite side
+    // of the centroid from the cluster's center of mass get a bonus.
+    // This prevents staircase growth in one direction.
+    const centroidX = sumX / placed.length;
+    const centroidY = sumY / placed.length;
+    const clusterMidX = (minX + maxX) / 2;
+    const clusterMidY = (minY + maxY) / 2;
+
+    // How off-center is the mass? Positive = mass is right/below of geometric center
+    const xImbalance = centroidX - clusterMidX;
+    const yImbalance = centroidY - clusterMidY;
+
+    // Reward candidates that counterbalance the mass
+    // If mass is shifted right, reward candidates to the left (and vice versa)
+    const xBalance = (candidateCX < clusterMidX && xImbalance > 0) ||
+                     (candidateCX > clusterMidX && xImbalance < 0)
+                     ? Math.abs(xImbalance) * 2 : 0;
+    const yBalance = (candidateCY < clusterMidY && yImbalance > 0) ||
+                     (candidateCY > clusterMidY && yImbalance < 0)
+                     ? Math.abs(yImbalance) * 2 : 0;
+
+    diversityBonus += xBalance + yBalance;
+
+    // Aspect ratio correction: reward spreading in the short axis
+    if (aspectRatio < 0.8) {
+      // Taller than wide → reward horizontal extension
+      const extendsH = candidateCX < minX || candidateCX > maxX;
+      if (extendsH) diversityBonus += 300 * (1 / aspectRatio);
+    } else if (aspectRatio > 1.3) {
+      // Wider than tall → reward vertical extension
+      const extendsV = candidateCY < minY || candidateCY > maxY;
+      if (extendsV) diversityBonus += 300 * aspectRatio;
     }
   }
 
