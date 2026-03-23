@@ -282,8 +282,8 @@ describe('generateCandidates', () => {
       { x: 0, y: 0, width: 100, height: 100, scale: 1 },
     ];
     const candidates = generateCandidates(placed, 80, 80, 1.0, 16);
-    // 4 edges × 5 offsets = 20 candidates
-    expect(candidates.length).toBe(20);
+    // 4 edges × 7 offsets = 28 candidates
+    expect(candidates.length).toBe(28);
   });
 
   it('generates more candidates with more placed frames', () => {
@@ -292,7 +292,7 @@ describe('generateCandidates', () => {
       { x: 200, y: 0, width: 100, height: 100, scale: 1 },
     ];
     const candidates = generateCandidates(placed, 80, 80, 1.0, 16);
-    expect(candidates.length).toBe(40); // 2 frames × 20
+    expect(candidates.length).toBe(56); // 2 frames × 28
   });
 
   it('candidates respect gap distance', () => {

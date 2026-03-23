@@ -81,16 +81,20 @@ export function computeBaseSize(
 // Collision detection
 // ---------------------------------------------------------------------------
 
+const OVERLAP_EPSILON = 0.01;
+
 export function rectsOverlap(
   a: { x: number; y: number; width: number; height: number },
   b: { x: number; y: number; width: number; height: number },
   gap: number,
 ): boolean {
+  // Use small epsilon to handle floating point imprecision
+  const g = gap - OVERLAP_EPSILON;
   return !(
-    a.x + a.width + gap <= b.x ||
-    b.x + b.width + gap <= a.x ||
-    a.y + a.height + gap <= b.y ||
-    b.y + b.height + gap <= a.y
+    a.x + a.width + g <= b.x ||
+    b.x + b.width + g <= a.x ||
+    a.y + a.height + g <= b.y ||
+    b.y + b.height + g <= a.y
   );
 }
 
@@ -189,12 +193,55 @@ export function scorePosition(
   const { contacts, contactLength } = getEdgeContact(candidate, placed, gap);
   const dist = distToCenter(candidate, centerX, centerY);
 
+  // Randomness scales inversely with placed count — more organic variety
+  // when few frames are placed, tighter clustering as the gallery fills
+  const randomWeight = Math.max(20, 80 - placed.length * 8);
+
+  // Directional diversity: prevent column/row stacking when few frames placed.
+  // Measures aspect ratio of the cluster and strongly rewards candidates
+  // that balance the cluster toward a square shape.
+  let diversityBonus = 0;
+  if (placed.length < 8) {
+    const candidateCX = candidate.x + candidate.width / 2;
+    const candidateCY = candidate.y + candidate.height / 2;
+
+    // Compute current cluster extents
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    for (const p of placed) {
+      if (p.x < minX) minX = p.x;
+      if (p.x + p.width > maxX) maxX = p.x + p.width;
+      if (p.y < minY) minY = p.y;
+      if (p.y + p.height > maxY) maxY = p.y + p.height;
+    }
+
+    const clusterW = maxX - minX || 1;
+    const clusterH = maxY - minY || 1;
+    const aspectRatio = clusterW / clusterH;
+
+    // If cluster is taller than wide (aspect < 1.0), strongly reward horizontal placement
+    if (aspectRatio < 1.0) {
+      const isHorizontal = candidateCX < minX || candidateCX > maxX;
+      if (isHorizontal) {
+        diversityBonus = 500 * (1 / aspectRatio);
+      }
+    }
+    // If cluster is much wider than tall (aspect > 1.5), reward vertical placement
+    else if (aspectRatio > 1.5) {
+      const isVertical = candidateCY < minY || candidateCY > maxY;
+      if (isVertical) {
+        diversityBonus = 300 * aspectRatio;
+      }
+    }
+  }
+
   return (
     contacts * 150 +
     contactLength * 3 -
-    dist * 0.8 +
+    dist * 0.5 +
     candidate.scale * 10 +
-    random * 8
+    random * randomWeight +
+    diversityBonus
   );
 }
 
@@ -220,20 +267,24 @@ export function generateCandidates(
   for (const p of placed) {
     // Y offsets for horizontal snapping (left/right of p)
     const yOffsets = [
-      p.y,
-      p.y + p.height - height,
-      p.y + (p.height - height) / 2,
-      p.y - height / 3,
-      p.y + p.height - (height * 2) / 3,
+      p.y,                                    // top-aligned
+      p.y + p.height - height,                // bottom-aligned
+      p.y + (p.height - height) / 2,          // center-aligned
+      p.y - height / 3,                       // offset up 1/3
+      p.y + p.height - (height * 2) / 3,      // offset down 1/3
+      p.y - height * 0.6,                     // offset up 60%
+      p.y + p.height - height * 0.4,          // offset down 40%
     ];
 
     // X offsets for vertical snapping (above/below p)
     const xOffsets = [
-      p.x,
-      p.x + p.width - width,
-      p.x + (p.width - width) / 2,
-      p.x - width / 3,
-      p.x + p.width - (width * 2) / 3,
+      p.x,                                    // left-aligned
+      p.x + p.width - width,                  // right-aligned
+      p.x + (p.width - width) / 2,            // center-aligned
+      p.x - width / 3,                        // offset left 1/3
+      p.x + p.width - (width * 2) / 3,        // offset right 1/3
+      p.x - width * 0.6,                      // offset left 60%
+      p.x + p.width - width * 0.4,            // offset right 40%
     ];
 
     // Right edge of p
@@ -414,6 +465,69 @@ export function localCompact(
     }
 
     if (!moved) break;
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Overlap resolution (push apart after scaling)
+// ---------------------------------------------------------------------------
+
+export function resolveOverlaps(
+  frames: PlacedFrame[],
+  gap: number,
+  iterations: number = 30,
+): PlacedFrame[] {
+  const result = frames.map((f) => ({ ...f }));
+
+  for (let iter = 0; iter < iterations; iter++) {
+    let hasOverlap = false;
+
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        if (!rectsOverlap(result[i], result[j], gap)) continue;
+        hasOverlap = true;
+
+        const a = result[i];
+        const b = result[j];
+
+        // Calculate overlap vector between centers
+        const acx = a.x + a.width / 2;
+        const acy = a.y + a.height / 2;
+        const bcx = b.x + b.width / 2;
+        const bcy = b.y + b.height / 2;
+
+        let dx = bcx - acx;
+        let dy = bcy - acy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 0.1) {
+          dx = 1;
+          dy = 0;
+        } else {
+          dx /= dist;
+          dy /= dist;
+        }
+
+        // Push each frame apart, but only if the move doesn't create new overlaps
+        const step = Math.max(2, gap * 0.5);
+
+        const newA = { ...a, x: a.x - dx * step, y: a.y - dy * step };
+        const othersA = result.filter((_, k) => k !== i && k !== j);
+        if (fitsWithoutOverlap(newA, othersA, gap)) {
+          result[i] = newA;
+        }
+
+        const newB = { ...b, x: b.x + dx * step, y: b.y + dy * step };
+        const othersB = result.filter((_, k) => k !== i && k !== j);
+        if (fitsWithoutOverlap(newB, othersB, gap)) {
+          result[j] = newB;
+        }
+      }
+    }
+
+    if (!hasOverlap) break;
   }
 
   return result;
