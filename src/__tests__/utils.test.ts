@@ -96,14 +96,14 @@ describe('computeBaseSize', () => {
   it('clamps oversized width', () => {
     // Very wide landscape — triggers w > maxW clamp
     const size = computeBaseSize({ width: 4000, height: 100 }, 680, 500);
-    expect(size.width).toBeLessThanOrEqual(680 * 0.5);
+    expect(size.width).toBeLessThanOrEqual(680 * 0.45);
     expect(size.height).toBeGreaterThan(0);
   });
 
   it('clamps oversized height', () => {
     // Very tall portrait — triggers h > maxH clamp
     const size = computeBaseSize({ width: 100, height: 4000 }, 680, 500);
-    expect(size.height).toBeLessThanOrEqual(500 * 0.5);
+    expect(size.height).toBeLessThanOrEqual(500 * 0.45);
     expect(size.width).toBeGreaterThan(0);
   });
 

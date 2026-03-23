@@ -147,7 +147,8 @@ describe('Pendu', () => {
         <Pendu.Image key="a" src="/a.jpg" width={800} height={600} />
       </Pendu>,
     );
-    expect(container.querySelectorAll('.pendu-frame')).toHaveLength(1);
+    // Exclude exit-animation ghost elements
+    expect(container.querySelectorAll('.pendu-frame:not(.pendu-frame--exiting)')).toHaveLength(1);
   });
 
   it('produces deterministic layout with seed', () => {

@@ -12,6 +12,8 @@ export interface PenduImageProps {
   onClick?: (e: React.MouseEvent) => void;
   /** @internal Injected by <Pendu> parent — consumers should not set this */
   _frameStyle?: React.CSSProperties;
+  /** @internal Injected by <Pendu> parent — used for FLIP animation tracking */
+  _penduKey?: string;
 }
 
 const PenduImage = memo(function PenduImage({
@@ -21,6 +23,7 @@ const PenduImage = memo(function PenduImage({
   style,
   onClick,
   _frameStyle,
+  _penduKey,
 }: PenduImageProps) {
   const [loaded, setLoaded] = useState(false);
 
@@ -29,6 +32,7 @@ const PenduImage = memo(function PenduImage({
       className={['pendu-frame', className].filter(Boolean).join(' ')}
       style={{ ..._frameStyle, ...style }}
       onClick={onClick}
+      data-pendu-key={_penduKey}
     >
       {!loaded && (
         <div
