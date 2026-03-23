@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="resources/pendu.png" alt="Pendu" width="400" />
+  <a href="https://pendu.chriswest.tech">
+    <img src="resources/pendu.png" alt="Pendu" width="400" />
+  </a>
 </p>
 
 <p align="center">
@@ -7,8 +9,15 @@
   Arrange images and custom content into beautiful, natural collages — no grid, no masonry, just art.
 </p>
 
+<p align="center">
+  <a href="https://pendu.chriswest.tech">Website</a> &middot;
+  <a href="https://pendu.chriswest.tech/examples">Examples</a> &middot;
+  <a href="https://pendu.chriswest.tech/docs">Docs</a> &middot;
+  <a href="https://pendu.chriswest.tech/playground">Playground</a>
+</p>
+
 [![npm version](https://img.shields.io/npm/v/@inkorange/pendu)](https://www.npmjs.com/package/@inkorange/pendu)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@inkorange/pendu)](https://bundlephobia.com/package/@inkorange/pendu)
+[![coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/inkorange/pendu)
 [![license](https://img.shields.io/npm/l/@inkorange/pendu)](https://github.com/inkorange/pendu/blob/main/LICENSE)
 
 ## Install
