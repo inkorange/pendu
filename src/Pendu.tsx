@@ -127,14 +127,16 @@ function PenduComponent({
         setContainerWidth(Math.round(width));
         setContainerMeasuredHeight(Math.round(height));
 
-        // Detect if parent imposes a fixed height by checking if the
-        // container's computed height is explicit (not auto/0)
-        const computed = getComputedStyle(el);
+        // Detect if parent imposes a fixed height constraint.
+        // getComputedStyle().height always resolves to px, so we check
+        // the parent's overflow and the inline/CSS height property instead.
         const parentEl = el.parentElement;
         if (parentEl) {
-          const parentComputed = getComputedStyle(parentEl);
-          const parentH = parentComputed.height;
-          hasFixedHeight.current = parentH !== 'auto' && parentH !== '0px' && parseFloat(parentH) > 0;
+          const parentStyle = getComputedStyle(parentEl);
+          const parentOverflow = parentStyle.overflow || parentStyle.overflowY;
+          const hasExplicitHeight = parentEl.style.height !== '' && parentEl.style.height !== 'auto';
+          const hasOverflowClip = parentOverflow === 'hidden' || parentOverflow === 'scroll' || parentOverflow === 'auto';
+          hasFixedHeight.current = hasExplicitHeight || hasOverflowClip;
         }
       }
     });
