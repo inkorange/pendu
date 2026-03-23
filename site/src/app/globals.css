@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0a;
+  --bg-card: #141414;
+  --bg-code: #1a1a2e;
+  --text: #ededed;
+  --text-muted: #888;
+  --accent: #c084fc;
+  --accent-dim: #7c3aed;
+  --border: #262626;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: white;
+}
