@@ -8,6 +8,7 @@ import {
   scorePosition,
   compactToCenter,
   fillInteriorGaps,
+  expandFrames,
   localCompact,
   resolveOverlaps,
   computeBounds,
@@ -118,6 +119,9 @@ export function computeLayout(
   // Compaction passes
   let frames = compactToCenter(placed, centerX, centerY, opts.gap, 15);
   frames = fillInteriorGaps(frames, centerX, centerY, opts.gap, 5);
+
+  // Expansion pass — grow frames to fill available space around them
+  frames = expandFrames(frames, opts.gap, 1.0, 3);
 
   // Re-center the cluster within the container
   if (frames.length > 0) {

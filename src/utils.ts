@@ -513,6 +513,63 @@ export function localCompact(
 }
 
 // ---------------------------------------------------------------------------
+// Frame expansion — grow frames to fill available space
+// ---------------------------------------------------------------------------
+
+export function expandFrames(
+  frames: PlacedFrame[],
+  gap: number,
+  maxScale: number = 1.0,
+  passes: number = 3,
+): PlacedFrame[] {
+  const result = frames.map((f) => ({ ...f }));
+
+  for (let pass = 0; pass < passes; pass++) {
+    for (let i = 0; i < result.length; i++) {
+      const frame = result[i];
+      const aspect = frame.width / frame.height;
+      const others = result.filter((_, j) => j !== i);
+
+      // Try progressively larger sizes (10% increments)
+      let bestW = frame.width;
+      let bestH = frame.height;
+      let bestScale = frame.scale;
+
+      for (let growth = 1.1; growth <= 1.5; growth += 0.1) {
+        const newW = frame.width * growth;
+        const newH = newW / aspect;
+        const newScale = frame.scale * growth;
+        if (newScale > maxScale) break;
+
+        // Keep the frame centered at its current position
+        const newX = frame.x - (newW - frame.width) / 2;
+        const newY = frame.y - (newH - frame.height) / 2;
+
+        const candidate = { x: newX, y: newY, width: newW, height: newH };
+        if (fitsWithoutOverlap(candidate, others, gap)) {
+          bestW = newW;
+          bestH = newH;
+          bestScale = newScale;
+          // Update position to stay centered
+          result[i] = {
+            ...result[i],
+            x: newX,
+            y: newY,
+            width: bestW,
+            height: bestH,
+            scale: bestScale,
+          };
+        } else {
+          break; // Can't grow further
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Overlap resolution (push apart after scaling)
 // ---------------------------------------------------------------------------
 
