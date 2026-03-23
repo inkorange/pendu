@@ -68,7 +68,7 @@ export function computeLayout(
       for (const c of candidates) {
         if (!fitsWithoutOverlap(c, placed, opts.gap)) continue;
 
-        let score = scorePosition(c, placed, centerX, centerY, opts.gap, prng());
+        let score = scorePosition(c, placed, centerX, centerY, opts.gap, prng(), opts.containerWidth, opts.containerHeight);
 
         // Soft penalty for exceeding container — allow up to 120% before
         // penalizing, since scale3d handles the visual fit. This lets the
@@ -177,7 +177,7 @@ export function addToLayout(
     for (const c of candidates) {
       if (!fitsWithoutOverlap(c, frames, opts.gap)) continue;
 
-      const score = scorePosition(c, frames, centerX, centerY, opts.gap, prng());
+      const score = scorePosition(c, frames, centerX, centerY, opts.gap, prng(), opts.containerWidth, opts.containerHeight);
       if (score > bestScore) {
         bestScore = score;
         bestCandidate = {

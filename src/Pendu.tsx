@@ -191,6 +191,12 @@ function PenduComponent({
     if (containerWidth === 0 || childItems.length === 0) return null;
 
     const availableWidth = containerWidth - padding * 2;
+    // Use actual height constraint when available, otherwise use the
+    // container width as height hint (the scale3d transform handles fit)
+    const availableHeight = maxHeight > 0
+      ? maxHeight - padding * 2
+      : availableWidth;
+
     return computeLayout(
       childItems.map((c) => c.imageData),
       {
@@ -199,11 +205,11 @@ function PenduComponent({
         padding: 0,
         seed: effectiveSeed,
         containerWidth: availableWidth,
-        containerHeight: availableWidth,
+        containerHeight: availableHeight,
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutKey, containerWidth]);
+  }, [layoutKey, containerWidth, maxHeight]);
 
   // ---------------------------------------------------------------------------
   // Compute fit scale (both axes)

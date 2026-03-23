@@ -187,9 +187,18 @@ export function scorePosition(
   centerY: number,
   gap: number,
   random: number,
+  containerWidth: number = 680,
+  containerHeight: number = 680,
 ): number {
   const { contacts, contactLength } = getEdgeContact(candidate, placed, gap);
-  const dist = distToCenter(candidate, centerX, centerY);
+
+  // Use aspect-weighted distance so wide containers don't penalize
+  // horizontal spread as much as vertical spread (and vice versa)
+  const cx = candidate.x + candidate.width / 2;
+  const cy = candidate.y + candidate.height / 2;
+  const normalizedDx = (cx - centerX) / (containerWidth || 1);
+  const normalizedDy = (cy - centerY) / (containerHeight || 1);
+  const dist = Math.sqrt(normalizedDx * normalizedDx + normalizedDy * normalizedDy) * Math.max(containerWidth, containerHeight);
 
   // Randomness scales inversely with placed count — more organic variety
   // when few frames are placed, tighter clustering as the gallery fills
