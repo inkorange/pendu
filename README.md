@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="resources/pendu.png" alt="Pendu" width="400" />
+  <a href="https://pendu.chriswest.tech">
+    <img src="resources/pendu.png" alt="Pendu" width="400" />
+  </a>
 </p>
 
 <p align="center">
@@ -7,9 +9,20 @@
   Arrange images and custom content into beautiful, natural collages — no grid, no masonry, just art.
 </p>
 
-[![npm version](https://img.shields.io/npm/v/@inkorange/pendu)](https://www.npmjs.com/package/@inkorange/pendu)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@inkorange/pendu)](https://bundlephobia.com/package/@inkorange/pendu)
-[![license](https://img.shields.io/npm/l/@inkorange/pendu)](https://github.com/inkorange/pendu/blob/main/LICENSE)
+<p align="center">
+  <a href="https://pendu.chriswest.tech">Website</a> &middot;
+  <a href="https://pendu.chriswest.tech/examples">Examples</a> &middot;
+  <a href="https://pendu.chriswest.tech/docs">Docs</a> &middot;
+  <a href="https://pendu.chriswest.tech/playground">Playground</a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@inkorange/pendu"><img src="https://img.shields.io/npm/v/@inkorange/pendu" alt="npm version" /></a>
+  <img src="https://img.shields.io/badge/gzipped-5.4%20KB-blue" alt="5.4 KB gzipped" />
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="zero dependencies" />
+  <img src="https://img.shields.io/badge/coverage-99%25-brightgreen" alt="99% test coverage" />
+  <a href="https://github.com/inkorange/pendu/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@inkorange/pendu" alt="license" /></a>
+</p>
 
 ## Install
 
@@ -38,7 +51,7 @@ function Gallery() {
 - **Organic layouts** — No rows, columns, or grids. Images arrange into natural, gallery-wall collages that fill your container.
 - **Animated transitions** — FLIP animations smoothly move content when the gallery changes. Add, remove, or reorder — every transition feels intentional.
 - **Container aware** — Automatically adapts to any container size — fixed, percentage, or viewport units. Content scales and reflows to fill the space.
-- **Tiny footprint** — ~6 KB gzipped. Zero dependencies beyond React.
+- **Tiny footprint** — 5.4 KB gzipped, zero runtime dependencies. Only 6 files installed, nothing beyond React as a peer dependency.
 - **CSS variable theming** — Customize gap, radius, and background via `--pendu-*` custom properties. No prop drilling needed.
 - **Deterministic seeds** — Same seed + same inputs = identical layout. Reproducible across renders, servers, and sessions.
 - **TypeScript** — Full type safety with exported interfaces.

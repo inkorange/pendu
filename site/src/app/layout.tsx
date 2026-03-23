@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: "%s | Pendu",
   },
   description:
-    "A lightweight React component that arranges images into beautiful, organic collage layouts. No grid. No masonry. Just art. ~6KB gzipped.",
+    "A lightweight React component that arranges images into beautiful, organic collage layouts. No grid. No masonry. Just art. 5.4 KB gzipped, zero dependencies.",
   keywords: [
     "react",
     "gallery",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Pendu — Organic Gallery Layouts for React",
     description:
-      "A lightweight React component for beautiful, organic gallery layouts. ~6KB gzipped.",
+      "A lightweight React component for beautiful, organic gallery layouts. 5.4 KB gzipped, zero dependencies.",
     images: ["/pendu.png"],
   },
   icons: {

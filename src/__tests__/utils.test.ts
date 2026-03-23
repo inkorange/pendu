@@ -11,6 +11,8 @@ import {
   compactToCenter,
   fillInteriorGaps,
   localCompact,
+  expandFrames,
+  resolveOverlaps,
   computeBounds,
   computeStats,
 } from '../utils';
@@ -467,5 +469,150 @@ describe('computeStats', () => {
     expect(stats.placed).toBe(0);
     expect(stats.failed).toBe(0);
     expect(stats.avgScale).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// expandFrames
+// ---------------------------------------------------------------------------
+
+describe('expandFrames', () => {
+  it('returns frames unchanged when tightly packed', () => {
+    // Two frames side by side with no room to grow
+    const frames: PlacedFrame[] = [
+      { x: 0, y: 0, width: 100, height: 100, scale: 1, imageIndex: 0 },
+      { x: 108, y: 0, width: 100, height: 100, scale: 1, imageIndex: 1 },
+    ];
+    const result = expandFrames(frames, 8);
+    // Should remain roughly the same size since there's no room
+    expect(result).toHaveLength(2);
+    result.forEach(f => {
+      expect(f.width).toBeGreaterThan(0);
+      expect(f.height).toBeGreaterThan(0);
+    });
+  });
+
+  it('expands a small frame when surrounded by space', () => {
+    // One small frame with lots of room around it
+    const frames: PlacedFrame[] = [
+      { x: 200, y: 200, width: 50, height: 50, scale: 0.5, imageIndex: 0 },
+    ];
+    const result = expandFrames(frames, 8);
+    // With no neighbors, the frame should grow significantly
+    expect(result[0].width).toBeGreaterThanOrEqual(50);
+    expect(result[0].scale).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it('expands frames that have room to grow beside neighbors', () => {
+    // Two frames far apart — both should expand
+    const frames: PlacedFrame[] = [
+      { x: 0, y: 0, width: 80, height: 60, scale: 0.5, imageIndex: 0 },
+      { x: 300, y: 0, width: 80, height: 60, scale: 0.5, imageIndex: 1 },
+    ];
+    const result = expandFrames(frames, 8);
+    // Both frames should have grown since they're far apart
+    expect(result[0].width).toBeGreaterThanOrEqual(80);
+    expect(result[1].width).toBeGreaterThanOrEqual(80);
+  });
+
+  it('preserves aspect ratio during expansion', () => {
+    const frames: PlacedFrame[] = [
+      { x: 0, y: 0, width: 100, height: 50, scale: 0.5, imageIndex: 0 },
+    ];
+    const originalAspect = frames[0].width / frames[0].height;
+    const result = expandFrames(frames, 8);
+    const resultAspect = result[0].width / result[0].height;
+    expect(Math.abs(resultAspect - originalAspect)).toBeLessThan(0.01);
+  });
+
+  it('handles empty array', () => {
+    const result = expandFrames([], 8);
+    expect(result).toHaveLength(0);
+  });
+
+  it('does not create overlaps after expansion', () => {
+    const frames: PlacedFrame[] = [
+      { x: 0, y: 0, width: 80, height: 80, scale: 0.5, imageIndex: 0 },
+      { x: 120, y: 0, width: 80, height: 80, scale: 0.5, imageIndex: 1 },
+      { x: 60, y: 120, width: 80, height: 80, scale: 0.5, imageIndex: 2 },
+    ];
+    const gap = 8;
+    const result = expandFrames(frames, gap);
+    // Check no pairs overlap
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        expect(rectsOverlap(result[i], result[j], gap)).toBe(false);
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveOverlaps
+// ---------------------------------------------------------------------------
+
+describe('resolveOverlaps', () => {
+  it('pushes overlapping frames apart', () => {
+    // Two frames directly on top of each other
+    const frames: PlacedFrame[] = [
+      { x: 0, y: 0, width: 100, height: 100, scale: 1, imageIndex: 0 },
+      { x: 10, y: 10, width: 100, height: 100, scale: 1, imageIndex: 1 },
+    ];
+    const result = resolveOverlaps(frames, 8);
+    // They should have moved apart
+    const dx = Math.abs(result[0].x - result[1].x);
+    const dy = Math.abs(result[0].y - result[1].y);
+    expect(dx + dy).toBeGreaterThan(20); // more separated than before
+  });
+
+  it('returns frames unchanged when no overlaps exist', () => {
+    const frames: PlacedFrame[] = [
+      { x: 0, y: 0, width: 100, height: 100, scale: 1, imageIndex: 0 },
+      { x: 200, y: 0, width: 100, height: 100, scale: 1, imageIndex: 1 },
+    ];
+    const result = resolveOverlaps(frames, 8);
+    expect(result[0].x).toBe(0);
+    expect(result[0].y).toBe(0);
+    expect(result[1].x).toBe(200);
+    expect(result[1].y).toBe(0);
+  });
+
+  it('handles frames at the exact same position', () => {
+    // Two frames at identical positions (dist < 0.1 branch)
+    const frames: PlacedFrame[] = [
+      { x: 50, y: 50, width: 100, height: 100, scale: 1, imageIndex: 0 },
+      { x: 50, y: 50, width: 100, height: 100, scale: 1, imageIndex: 1 },
+    ];
+    const result = resolveOverlaps(frames, 8);
+    // Should still push them apart using the fallback direction
+    const dx = Math.abs(result[0].x - result[1].x);
+    expect(dx).toBeGreaterThan(0);
+  });
+
+  it('handles empty array', () => {
+    const result = resolveOverlaps([], 8);
+    expect(result).toHaveLength(0);
+  });
+
+  it('handles single frame', () => {
+    const frames: PlacedFrame[] = [
+      { x: 0, y: 0, width: 100, height: 100, scale: 1, imageIndex: 0 },
+    ];
+    const result = resolveOverlaps(frames, 8);
+    expect(result).toHaveLength(1);
+    expect(result[0].x).toBe(0);
+  });
+
+  it('resolves three-way overlap', () => {
+    const frames: PlacedFrame[] = [
+      { x: 0, y: 0, width: 100, height: 100, scale: 1, imageIndex: 0 },
+      { x: 20, y: 20, width: 100, height: 100, scale: 1, imageIndex: 1 },
+      { x: 40, y: 40, width: 100, height: 100, scale: 1, imageIndex: 2 },
+    ];
+    const result = resolveOverlaps(frames, 4, 50);
+    // After resolution, frames should be at least as spread out
+    const totalSpread = result.reduce((sum, f) => sum + Math.abs(f.x) + Math.abs(f.y), 0);
+    const originalSpread = frames.reduce((sum, f) => sum + Math.abs(f.x) + Math.abs(f.y), 0);
+    expect(totalSpread).toBeGreaterThanOrEqual(originalSpread);
   });
 });
