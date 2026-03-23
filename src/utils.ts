@@ -197,15 +197,13 @@ export function scorePosition(
   // when few frames are placed, tighter clustering as the gallery fills
   const randomWeight = Math.max(20, 80 - placed.length * 8);
 
-  // Directional diversity: prevent column/row stacking when few frames placed.
-  // Measures aspect ratio of the cluster and strongly rewards candidates
-  // that balance the cluster toward a square shape.
+  // Directional diversity: reward candidates that balance the cluster
+  // toward a square/diamond shape. Active at ALL frame counts.
   let diversityBonus = 0;
-  if (placed.length < 8) {
+  {
     const candidateCX = candidate.x + candidate.width / 2;
     const candidateCY = candidate.y + candidate.height / 2;
 
-    // Compute current cluster extents
     let minX = Infinity, maxX = -Infinity;
     let minY = Infinity, maxY = -Infinity;
     for (const p of placed) {
@@ -219,18 +217,18 @@ export function scorePosition(
     const clusterH = maxY - minY || 1;
     const aspectRatio = clusterW / clusterH;
 
-    // If cluster is taller than wide (aspect < 1.0), strongly reward horizontal placement
-    if (aspectRatio < 1.0) {
+    // Taller than wide → reward horizontal placement
+    if (aspectRatio < 0.9) {
       const isHorizontal = candidateCX < minX || candidateCX > maxX;
       if (isHorizontal) {
-        diversityBonus = 500 * (1 / aspectRatio);
+        diversityBonus = 400 * (1 / aspectRatio);
       }
     }
-    // If cluster is much wider than tall (aspect > 1.5), reward vertical placement
-    else if (aspectRatio > 1.5) {
+    // Wider than tall → reward vertical placement
+    else if (aspectRatio > 1.3) {
       const isVertical = candidateCY < minY || candidateCY > maxY;
       if (isVertical) {
-        diversityBonus = 300 * aspectRatio;
+        diversityBonus = 400 * aspectRatio;
       }
     }
   }
@@ -333,6 +331,19 @@ export function compactToCenter(
       (a, b) => distToCenter(a, centerX, centerY) - distToCenter(b, centerX, centerY),
     );
 
+    // Compute current cluster aspect ratio to bias compaction
+    // toward making the cluster more square/diamond shaped
+    const bounds = computeBounds(result);
+    const clusterW = bounds.width || 1;
+    const clusterH = bounds.height || 1;
+    const aspect = clusterW / clusterH;
+
+    // Dampen the axis that's already too short
+    // aspect < 1 = taller than wide → reduce vertical pull
+    // aspect > 1 = wider than tall → reduce horizontal pull
+    const xDampen = aspect > 1.3 ? 0.3 : 1.0;
+    const yDampen = aspect < 0.7 ? 0.3 : 1.0;
+
     let moved = false;
 
     for (const frame of sorted) {
@@ -346,8 +357,8 @@ export function compactToCenter(
       if (dist < 1) continue;
 
       const stepSize = Math.max(1, 8 - iter * 0.4);
-      const nx = (dx / dist) * stepSize;
-      const ny = (dy / dist) * stepSize;
+      const nx = (dx / dist) * stepSize * xDampen;
+      const ny = (dy / dist) * stepSize * yDampen;
 
       const moved_frame = { ...frame, x: frame.x + nx, y: frame.y + ny };
       const others = result.filter((_, i) => i !== idx);
