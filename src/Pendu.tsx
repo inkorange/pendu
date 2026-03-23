@@ -102,6 +102,8 @@ function PenduComponent({
   const innerRef = useRef<HTMLDivElement>(null);
   const seedRef = useRef<number>(seed ?? Math.floor(Math.random() * 0x100000000));
   const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [containerMeasuredHeight, setContainerMeasuredHeight] = useState<number>(0);
+  const hasFixedHeight = useRef(false);
 
   // Track previous frame positions for FLIP (keyed by child key)
   const prevSnapshotsRef = useRef<Map<string, FrameSnapshot>>(new Map());
@@ -111,7 +113,7 @@ function PenduComponent({
   const effectiveSeed = seed ?? seedRef.current;
 
   // ---------------------------------------------------------------------------
-  // ResizeObserver
+  // ResizeObserver — track both width and height
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
@@ -121,7 +123,19 @@ function PenduComponent({
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const width = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+        const height = entry.contentBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
         setContainerWidth(Math.round(width));
+        setContainerMeasuredHeight(Math.round(height));
+
+        // Detect if parent imposes a fixed height by checking if the
+        // container's computed height is explicit (not auto/0)
+        const computed = getComputedStyle(el);
+        const parentEl = el.parentElement;
+        if (parentEl) {
+          const parentComputed = getComputedStyle(parentEl);
+          const parentH = parentComputed.height;
+          hasFixedHeight.current = parentH !== 'auto' && parentH !== '0px' && parseFloat(parentH) > 0;
+        }
       }
     });
 
@@ -165,11 +179,34 @@ function PenduComponent({
   const availableWidth = containerWidth - padding * 2;
   const layoutWidth = layout ? layout.bounds.width : 0;
   const layoutHeight = layout ? layout.bounds.height : 0;
-  const fitScale = layoutWidth > availableWidth ? availableWidth / layoutWidth : 1;
+
+  // Scale to fit both width AND height constraints
+  let fitScale = 1;
+  if (layoutWidth > 0) {
+    const widthScale = layoutWidth > availableWidth ? availableWidth / layoutWidth : 1;
+    fitScale = widthScale;
+  }
+
+  // If parent has a fixed/constrained height, also scale to fit vertically
+  if (hasFixedHeight.current && containerMeasuredHeight > 0 && layoutHeight > 0) {
+    const availableHeight = containerMeasuredHeight - padding * 2;
+    if (layoutHeight * fitScale > availableHeight) {
+      const heightScale = availableHeight / layoutHeight;
+      fitScale = Math.min(fitScale, heightScale);
+    }
+  }
+
   const scaledLayoutHeight = layoutHeight * fitScale;
   const scaledLayoutWidth = layoutWidth * fitScale;
   const horizontalOffset = (availableWidth - scaledLayoutWidth) / 2;
-  const containerHeight = layout ? scaledLayoutHeight + padding * 2 : 0;
+
+  // When parent has fixed height, use that; otherwise auto-size to content
+  const verticalOffset = hasFixedHeight.current && containerMeasuredHeight > 0
+    ? ((containerMeasuredHeight - padding * 2) - scaledLayoutHeight) / 2
+    : 0;
+  const containerHeight = layout
+    ? (hasFixedHeight.current ? containerMeasuredHeight : scaledLayoutHeight + padding * 2)
+    : 0;
 
   // Build a map of key → rendered position for the current layout
   const currentSnapshots = useMemo(() => {
@@ -336,7 +373,8 @@ function PenduComponent({
     '--pendu-transition-duration': `${animationDuration}ms`,
     position: 'relative' as const,
     width: '100%',
-    height: containerHeight > 0 ? containerHeight : 'auto',
+    // Only set height when parent doesn't constrain it (auto-size to content)
+    ...(hasFixedHeight.current ? {} : { height: containerHeight > 0 ? containerHeight : 'auto' }),
     background: 'var(--pendu-bg)',
     overflow: 'hidden' as const,
     ...style,
@@ -345,9 +383,10 @@ function PenduComponent({
   const innerStyle: React.CSSProperties = {
     position: 'absolute' as const,
     left: padding + horizontalOffset,
-    top: padding,
+    top: padding + verticalOffset,
     width: layoutWidth,
     height: layoutHeight,
+    transition: animate ? `transform ${animationDuration}ms cubic-bezier(0.25, 0.1, 0.25, 1)` : undefined,
     transform: fitScale < 1 ? `scale3d(${fitScale}, ${fitScale}, 1)` : undefined,
     transformOrigin: 'top left',
   };
