@@ -61,9 +61,9 @@ const features = [
       "Automatically adapts to any container size — fixed, percentage, or viewport units. Images scale and reflow to fill the space.",
   },
   {
-    title: "Tiny Footprint",
+    title: "5.4 KB Gzipped",
     description:
-      "~6 KB gzipped. Zero dependencies beyond React. Ships ESM and CJS with full TypeScript types.",
+      "Zero runtime dependencies. Only 6 files installed — nothing beyond React as a peer dependency. Ships ESM and CJS with full TypeScript types.",
   },
   {
     title: "CSS Variable Theming",
