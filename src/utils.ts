@@ -189,12 +189,16 @@ export function scorePosition(
   const { contacts, contactLength } = getEdgeContact(candidate, placed, gap);
   const dist = distToCenter(candidate, centerX, centerY);
 
+  // Randomness scales inversely with placed count — more organic variety
+  // when few frames are placed, tighter clustering as the gallery fills
+  const randomWeight = Math.max(20, 80 - placed.length * 8);
+
   return (
     contacts * 150 +
     contactLength * 3 -
-    dist * 0.8 +
+    dist * 0.5 +
     candidate.scale * 10 +
-    random * 8
+    random * randomWeight
   );
 }
 
@@ -220,20 +224,24 @@ export function generateCandidates(
   for (const p of placed) {
     // Y offsets for horizontal snapping (left/right of p)
     const yOffsets = [
-      p.y,
-      p.y + p.height - height,
-      p.y + (p.height - height) / 2,
-      p.y - height / 3,
-      p.y + p.height - (height * 2) / 3,
+      p.y,                                    // top-aligned
+      p.y + p.height - height,                // bottom-aligned
+      p.y + (p.height - height) / 2,          // center-aligned
+      p.y - height / 3,                       // offset up 1/3
+      p.y + p.height - (height * 2) / 3,      // offset down 1/3
+      p.y - height * 0.6,                     // offset up 60%
+      p.y + p.height - height * 0.4,          // offset down 40%
     ];
 
     // X offsets for vertical snapping (above/below p)
     const xOffsets = [
-      p.x,
-      p.x + p.width - width,
-      p.x + (p.width - width) / 2,
-      p.x - width / 3,
-      p.x + p.width - (width * 2) / 3,
+      p.x,                                    // left-aligned
+      p.x + p.width - width,                  // right-aligned
+      p.x + (p.width - width) / 2,            // center-aligned
+      p.x - width / 3,                        // offset left 1/3
+      p.x + p.width - (width * 2) / 3,        // offset right 1/3
+      p.x - width * 0.6,                      // offset left 60%
+      p.x + p.width - width * 0.4,            // offset right 40%
     ];
 
     // Right edge of p
