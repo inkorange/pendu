@@ -81,13 +81,13 @@ describe('computeBaseSize', () => {
   it('computes landscape base size', () => {
     const size = computeBaseSize({ width: 1200, height: 800 }, 680, 500);
     expect(size.width).toBeGreaterThan(size.height);
-    expect(size.width).toBeLessThanOrEqual(680 * 0.5);
+    expect(size.width).toBeLessThanOrEqual(680 * 0.6);
   });
 
   it('computes portrait base size', () => {
     const size = computeBaseSize({ width: 800, height: 1200 }, 680, 500);
     expect(size.height).toBeGreaterThan(size.width);
-    expect(size.height).toBeLessThanOrEqual(500 * 0.5);
+    expect(size.height).toBeLessThanOrEqual(500 * 0.6);
   });
 
   it('computes square base size', () => {
@@ -98,22 +98,21 @@ describe('computeBaseSize', () => {
   it('clamps oversized width', () => {
     // Very wide landscape — triggers w > maxW clamp
     const size = computeBaseSize({ width: 4000, height: 100 }, 680, 500);
-    expect(size.width).toBeLessThanOrEqual(680 * 0.45);
+    expect(size.width).toBeLessThanOrEqual(680 * 0.55);
     expect(size.height).toBeGreaterThan(0);
   });
 
   it('clamps oversized height', () => {
     // Very tall portrait — triggers h > maxH clamp
     const size = computeBaseSize({ width: 100, height: 4000 }, 680, 500);
-    expect(size.height).toBeLessThanOrEqual(500 * 0.45);
+    expect(size.height).toBeLessThanOrEqual(500 * 0.55);
     expect(size.width).toBeGreaterThan(0);
   });
 
   it('clamps both dimensions for extreme aspect ratios', () => {
-    // A wide landscape where initial width is fine but height calc overshoots
     const size = computeBaseSize({ width: 1000, height: 990 }, 200, 200);
-    expect(size.width).toBeLessThanOrEqual(200 * 0.5);
-    expect(size.height).toBeLessThanOrEqual(200 * 0.5);
+    expect(size.width).toBeLessThanOrEqual(200 * 0.6);
+    expect(size.height).toBeLessThanOrEqual(200 * 0.6);
   });
 });
 

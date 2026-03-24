@@ -51,19 +51,21 @@ export function computeBaseSize(
 ): { width: number; height: number } {
   const aspect = image.width / image.height;
 
-  // Size frames so the total cluster area roughly fills the container.
-  // Target: each frame occupies ~(containerArea / totalImages) pixels,
-  // which gives us a target frame area to derive width and height from.
+  // Size frames so the total cluster area fills the container generously.
+  // The organic layout has gaps and imperfect packing, so we overshoot by
+  // a fill factor to compensate. With 6 images this targets ~85% fill;
+  // the expansion pass and fit-scale handle any overflow.
   const containerArea = containerWidth * containerHeight;
-  const targetFrameArea = containerArea / Math.max(1, totalImages);
+  const fillFactor = 1.4 + (0.3 / Math.max(1, totalImages)); // more generous for fewer images
+  const targetFrameArea = (containerArea * fillFactor) / Math.max(1, totalImages);
   // Derive width from area: area = w * h = w * (w / aspect) = w² / aspect
   // So w = sqrt(area * aspect)
   let w = Math.sqrt(targetFrameArea * aspect);
   let h = w / aspect;
 
   // Clamp so no single frame dominates the container
-  const maxW = containerWidth * 0.45;
-  const maxH = containerHeight * 0.45;
+  const maxW = containerWidth * 0.55;
+  const maxH = containerHeight * 0.55;
   if (w > maxW) { w = maxW; h = w / aspect; }
   if (h > maxH) { h = maxH; w = h * aspect; }
 
@@ -519,10 +521,57 @@ export function localCompact(
 export function expandFrames(
   frames: PlacedFrame[],
   gap: number,
-  maxScale: number = 2.0,
+  maxScale: number = 3.0,
   passes: number = 5,
 ): PlacedFrame[] {
   const result = frames.map((f) => ({ ...f }));
+
+  // Try expanding a frame with a given anchor bias (0 = grow from left/top, 0.5 = center, 1 = right/bottom)
+  function tryExpand(
+    frame: PlacedFrame,
+    others: PlacedFrame[],
+    aspect: number,
+    anchorX: number,
+    anchorY: number,
+    maxGrowth: number,
+  ): { factor: number; x: number; y: number; w: number; h: number } | null {
+    const origW = frame.width;
+    const origH = frame.height;
+    let lo = 1.0;
+    let hi = maxGrowth;
+    if (hi <= 1.01) return null;
+
+    // Test upper bound first
+    const maxW = origW * hi;
+    const maxH = maxW / aspect;
+    const maxX = frame.x - (maxW - origW) * anchorX;
+    const maxY = frame.y - (maxH - origH) * anchorY;
+    if (fitsWithoutOverlap({ x: maxX, y: maxY, width: maxW, height: maxH }, others, gap)) {
+      return { factor: hi, x: maxX, y: maxY, w: maxW, h: maxH };
+    }
+
+    for (let step = 0; step < 10; step++) {
+      const mid = (lo + hi) / 2;
+      const w = origW * mid;
+      const h = w / aspect;
+      const x = frame.x - (w - origW) * anchorX;
+      const y = frame.y - (h - origH) * anchorY;
+      if (fitsWithoutOverlap({ x, y, width: w, height: h }, others, gap)) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+
+    if (lo > 1.02) {
+      const w = origW * lo;
+      const h = w / aspect;
+      const x = frame.x - (w - origW) * anchorX;
+      const y = frame.y - (h - origH) * anchorY;
+      return { factor: lo, x, y, w, h };
+    }
+    return null;
+  }
 
   for (let pass = 0; pass < passes; pass++) {
     let anyGrew = false;
@@ -531,46 +580,27 @@ export function expandFrames(
       const frame = result[i];
       const aspect = frame.width / frame.height;
       const others = result.filter((_, j) => j !== i);
-      const origW = frame.width;
-      const origH = frame.height;
+      const maxGrowth = maxScale / frame.scale;
 
-      // Binary search for the max growth factor that fits
-      let lo = 1.0;
-      let hi = maxScale / frame.scale;
-      if (hi <= 1.01) continue;
+      // Try multiple anchor points: center, then biased toward each direction
+      const anchors: [number, number][] = [
+        [0.5, 0.5],  // center
+        [0, 0.5],    // grow rightward
+        [1, 0.5],    // grow leftward
+        [0.5, 0],    // grow downward
+        [0.5, 1],    // grow upward
+      ];
 
-      // Test upper bound first — if it fits, take it
-      const maxW = origW * hi;
-      const maxH = maxW / aspect;
-      const maxX = frame.x - (maxW - origW) / 2;
-      const maxY = frame.y - (maxH - origH) / 2;
-      if (fitsWithoutOverlap({ x: maxX, y: maxY, width: maxW, height: maxH }, others, gap)) {
-        result[i] = { ...result[i], x: maxX, y: maxY, width: maxW, height: maxH, scale: frame.scale * hi };
-        anyGrew = true;
-        continue;
-      }
-
-      // Binary search for the largest growth that fits
-      for (let step = 0; step < 8; step++) {
-        const mid = (lo + hi) / 2;
-        const w = origW * mid;
-        const h = w / aspect;
-        const x = frame.x - (w - origW) / 2;
-        const y = frame.y - (h - origH) / 2;
-
-        if (fitsWithoutOverlap({ x, y, width: w, height: h }, others, gap)) {
-          lo = mid;
-        } else {
-          hi = mid;
+      let best: ReturnType<typeof tryExpand> = null;
+      for (const [ax, ay] of anchors) {
+        const attempt = tryExpand(frame, others, aspect, ax, ay, maxGrowth);
+        if (attempt && (!best || attempt.factor > best.factor)) {
+          best = attempt;
         }
       }
 
-      if (lo > 1.02) {
-        const finalW = origW * lo;
-        const finalH = finalW / aspect;
-        const finalX = frame.x - (finalW - origW) / 2;
-        const finalY = frame.y - (finalH - origH) / 2;
-        result[i] = { ...result[i], x: finalX, y: finalY, width: finalW, height: finalH, scale: frame.scale * lo };
+      if (best) {
+        result[i] = { ...result[i], x: best.x, y: best.y, width: best.w, height: best.h, scale: frame.scale * best.factor };
         anyGrew = true;
       }
     }
