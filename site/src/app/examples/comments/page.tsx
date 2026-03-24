@@ -190,7 +190,7 @@ export default function CommentsExample() {
           </button>
         </div>
         <div className="flex-1 mx-[5vw] mb-[5vh]">
-          <Pendu gap={16} seed={seed}>
+          <Pendu gap={16} seed={seed} animationDuration={600} {...{ animationStyle: "slide" } as Record<string, unknown>}>
             {visible.map((photo) => (
               <Pendu.Item
                 key={photo.id}

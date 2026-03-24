@@ -35,6 +35,8 @@ const CSS_VAR_DEFAULTS: Record<string, string> = {
 // Types
 // ---------------------------------------------------------------------------
 
+export type PenduAnimationStyle = 'scale' | 'slide' | 'fade';
+
 export interface PenduProps {
   gap?: number;
   minScale?: number;
@@ -42,6 +44,7 @@ export interface PenduProps {
   seed?: number;
   animate?: boolean;
   animationDuration?: number;
+  animationStyle?: PenduAnimationStyle;
   className?: string;
   style?: React.CSSProperties;
   children: React.ReactNode;
@@ -109,6 +112,7 @@ function PenduComponent({
   seed,
   animate = true,
   animationDuration = 300,
+  animationStyle = 'scale',
   className,
   style,
   children,
@@ -313,6 +317,21 @@ function PenduComponent({
     const prevSnapshots = prevSnapshotsRef.current;
     const easing = 'cubic-bezier(0.25, 0.1, 0.25, 1)';
 
+    // Compute slide direction for an element based on its position relative to the container center
+    const getSlideTransform = (left: number, top: number, width: number, height: number): string => {
+      const containerW = innerRef.current?.offsetWidth ?? 1;
+      const containerH = innerRef.current?.offsetHeight ?? 1;
+      const cx = (left + width / 2) / containerW;
+      const cy = (top + height / 2) / containerH;
+      const dx = cx - 0.5;
+      const dy = cy - 0.5;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        return dx > 0 ? `translateX(${width}px)` : `translateX(-${width}px)`;
+      }
+      return dy > 0 ? `translateY(${height}px)` : `translateY(-${height}px)`;
+    };
+
     frameEls.forEach((el) => {
       const key = el.dataset.penduKey;
       if (!key) return;
@@ -325,11 +344,19 @@ function PenduComponent({
       if (!prev || !prevKeys.has(key)) {
         // ENTER
         el.style.transition = 'none';
-        el.style.transform = 'scale(0.7)';
-        el.style.opacity = '0';
+        if (animationStyle === 'slide') {
+          el.style.transform = getSlideTransform(curr.left, curr.top, curr.width, curr.height);
+          el.style.opacity = '0';
+        } else if (animationStyle === 'fade') {
+          el.style.transform = '';
+          el.style.opacity = '0';
+        } else {
+          el.style.transform = 'scale(0.7)';
+          el.style.opacity = '0';
+        }
         void el.offsetHeight;
         el.style.transition = `transform ${animationDuration}ms ${easing}, opacity ${animationDuration}ms ${easing}`;
-        el.style.transform = 'scale(1)';
+        el.style.transform = animationStyle === 'fade' ? '' : 'scale(1) translate(0, 0)';
         el.style.opacity = '1';
         const cleanup = () => { el.style.removeProperty('transition'); el.style.removeProperty('transform'); el.style.removeProperty('opacity'); el.removeEventListener('transitionend', cleanup); };
         el.addEventListener('transitionend', cleanup, { once: true });
@@ -362,7 +389,13 @@ function PenduComponent({
       inner.appendChild(ghost);
       void ghost.offsetHeight;
       ghost.style.transition = `transform ${animationDuration}ms ${easing}, opacity ${animationDuration}ms ${easing}`;
-      ghost.style.transform = 'scale(0.7)';
+      if (animationStyle === 'slide') {
+        ghost.style.transform = getSlideTransform(prev.left, prev.top, prev.width, prev.height);
+      } else if (animationStyle === 'fade') {
+        // no transform, just fade
+      } else {
+        ghost.style.transform = 'scale(0.7)';
+      }
       ghost.style.opacity = '0';
       ghost.addEventListener('transitionend', () => ghost.remove(), { once: true });
       setTimeout(() => ghost.remove(), animationDuration + 50);
@@ -370,7 +403,7 @@ function PenduComponent({
 
     prevSnapshotsRef.current = new Map(currentSnapshots);
     prevKeysRef.current = currentKeys;
-  }, [layout, animate, animationDuration, childItems, currentSnapshots]);
+  }, [layout, animate, animationDuration, animationStyle, childItems, currentSnapshots]);
 
   // ---------------------------------------------------------------------------
   // Render
