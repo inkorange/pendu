@@ -63,9 +63,18 @@ export default function Examples() {
       <main className="pt-14">
         <div className="max-w-6xl mx-auto px-6 py-16">
           <h1 className="text-4xl font-bold mb-4">Examples</h1>
-          <p className="text-[var(--text-muted)] mb-12">
+          <p className="text-[var(--text-muted)] mb-6">
             Interactive demos showing Pendu in action.
           </p>
+
+          <div className="flex flex-wrap gap-3 mb-12">
+            <a
+              href="/examples/photos"
+              className="px-4 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-muted)] transition-colors"
+            >
+              Photo Gallery →
+            </a>
+          </div>
 
           {/* Dynamic add/remove */}
           <section className="mb-20">
