@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://pendu.chriswest.tech">
-    <img src="resources/pendu.png" alt="Pendu" width="400" />
+    <img src="https://raw.githubusercontent.com/inkorange/pendu/main/resources/pendu.png" alt="Pendu" width="400" />
   </a>
 </p>
 
@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <img src="resources/pendu.gif" alt="Pendu demo — organic gallery layout with animated transitions" width="700" />
+  <img src="https://raw.githubusercontent.com/inkorange/pendu/main/resources/pendu.gif" alt="Pendu demo — organic gallery layout with animated transitions" width="700" />
 </p>
 
 ## Install
