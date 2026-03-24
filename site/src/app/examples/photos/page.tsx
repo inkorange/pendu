@@ -22,6 +22,7 @@ const allPhotos = [
   { id: "15", src: "/demo/photos/20260219_180543.jpg", width: 900, height: 1200, alt: "Photo 15" },
   { id: "16", src: "/demo/photos/20260228_125111.jpg", width: 900, height: 1200, alt: "Photo 16" },
   { id: "17", src: "/demo/photos/20260228_182633.jpg", width: 1200, height: 900, alt: "Photo 17" },
+  { id: "18", src: "/demo/photos/20240624_205738.jpg", width: 700, height: 1441, alt: "Photo 18" },
 ];
 
 const VISIBLE_COUNT = 8;

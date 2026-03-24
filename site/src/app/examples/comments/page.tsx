@@ -22,6 +22,7 @@ const allPhotos = [
   { id: "15", src: "/demo/photos/20260219_180543.jpg", width: 900, height: 1200, handle: "@island.life", caption: "This is what slow living looks like", alt: "Photo 15" },
   { id: "16", src: "/demo/photos/20260228_125111.jpg", width: 900, height: 1200, handle: "@reef.walker", caption: "The ocean floor is another world", alt: "Photo 16" },
   { id: "17", src: "/demo/photos/20260228_182633.jpg", width: 1200, height: 900, handle: "@horizon.line", caption: "Where the sky meets the sea", alt: "Photo 17" },
+  { id: "18", src: "/demo/photos/20240624_205738.jpg", width: 700, height: 1441, handle: "@tall.tales", caption: "Some views go on forever", alt: "Photo 18" },
 ];
 
 const VISIBLE_COUNT = 6;
