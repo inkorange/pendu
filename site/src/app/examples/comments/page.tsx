@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Pendu } from "@inkorange/pendu";
 import { Nav } from "@/components/Nav";
 
@@ -29,114 +29,6 @@ const VISIBLE_COUNT = 6;
 const ROTATE_INTERVAL = 3000;
 const TRANSITION_MS = 800;
 
-// Determines slide direction based on the card's position in the viewport.
-// Cards slide toward the nearest edge — left cards slide left, right cards
-// slide right, etc. The incoming image slides in from the opposite side.
-function getSlideDirection(el: HTMLElement): { outX: string; outY: string; inX: string; inY: string } {
-  const rect = el.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-
-  // Normalized position: 0 = left/top edge, 1 = right/bottom edge
-  const nx = cx / vw;
-  const ny = cy / vh;
-
-  // Distance from center (0.5) on each axis
-  const dx = nx - 0.5;
-  const dy = ny - 0.5;
-
-  // Pick the axis with the stronger bias
-  if (Math.abs(dx) > Math.abs(dy)) {
-    // Slide horizontally
-    const dir = dx > 0 ? 1 : -1;
-    return {
-      outX: `${dir * 120}%`, outY: "0",
-      inX: `${-dir * 80}%`, inY: "0",
-    };
-  } else {
-    // Slide vertically
-    const dir = dy > 0 ? 1 : -1;
-    return {
-      outX: "0", outY: `${dir * 120}%`,
-      inX: "0", inY: `${-dir * 80}%`,
-    };
-  }
-}
-
-function SlideSwapImage({ src, alt }: { src: string; alt: string }) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [layers, setLayers] = useState([{ src, key: 0, slideDir: null as ReturnType<typeof getSlideDirection> | null }]);
-  const counterRef = useRef(0);
-
-  useEffect(() => {
-    if (src === layers[layers.length - 1].src) return;
-
-    counterRef.current += 1;
-    const newKey = counterRef.current;
-
-    // Compute slide direction from the card's current viewport position
-    const dir = containerRef.current ? getSlideDirection(containerRef.current) : {
-      outX: "120%", outY: "0", inX: "-80%", inY: "0",
-    };
-
-    setLayers((prev) => [...prev, { src, key: newKey, slideDir: dir }]);
-
-    const timer = setTimeout(() => {
-      setLayers((prev) => prev.filter((l) => l.key === newKey));
-    }, TRANSITION_MS + 100);
-
-    return () => clearTimeout(timer);
-  }, [src, layers]);
-
-  // Generate unique keyframe names per layer to avoid conflicts
-  const keyframes = layers
-    .filter((l) => l.slideDir)
-    .map((l) => `
-      @keyframes slide-out-${l.key} {
-        from { opacity: 1; transform: translate(0, 0); }
-        to { opacity: 0; transform: translate(${l.slideDir!.outX}, ${l.slideDir!.outY}); }
-      }
-      @keyframes slide-in-${l.key} {
-        from { opacity: 0; transform: translate(${l.slideDir!.inX}, ${l.slideDir!.inY}); }
-        to { opacity: 1; transform: translate(0, 0); }
-      }
-    `)
-    .join("\n");
-
-  return (
-    <div ref={containerRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-      <style>{keyframes}</style>
-      {layers.map((layer, i) => {
-        const isTop = i === layers.length - 1;
-        const isAnimatingIn = layers.length > 1 && isTop && layer.slideDir;
-        const isAnimatingOut = layers.length > 1 && !isTop && layer.slideDir;
-
-        return (
-          <img
-            key={layer.key}
-            src={layer.src}
-            alt={isTop ? alt : ""}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              zIndex: i,
-              animation: isAnimatingIn
-                ? `slide-in-${layer.key} ${TRANSITION_MS}ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards`
-                : isAnimatingOut
-                  ? `slide-out-${layer.key} ${TRANSITION_MS}ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards`
-                  : "none",
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
 
 function SocialCard({
   src,
@@ -163,7 +55,17 @@ function SocialCard({
       }}
     >
       <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-        <SlideSwapImage src={src} alt={alt} />
+        <img
+          src={src}
+          alt={alt}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
 
         {/* Gradient overlay at top */}
         <div
@@ -248,16 +150,9 @@ function SocialCard({
   );
 }
 
-function buildSlots(photos: typeof allPhotos) {
-  return photos.map((photo, i) => ({
-    ...photo,
-    slotKey: `slot-${i}`,
-  }));
-}
-
 export default function CommentsExample() {
   const [seed] = useState(() => Math.floor(Math.random() * 100000));
-  const [visible, setVisible] = useState(() => buildSlots(allPhotos.slice(0, VISIBLE_COUNT)));
+  const [visible, setVisible] = useState(allPhotos.slice(0, VISIBLE_COUNT));
   const [nextIndex, setNextIndex] = useState(VISIBLE_COUNT);
   const [replaceSlot, setReplaceSlot] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -266,10 +161,7 @@ export default function CommentsExample() {
     setVisible((prev) => {
       const next = allPhotos[nextIndex % allPhotos.length];
       const updated = [...prev];
-      updated[replaceSlot] = {
-        ...next,
-        slotKey: `slot-${replaceSlot}`,
-      };
+      updated[replaceSlot] = next;
       return updated;
     });
     setNextIndex((i) => i + 1);
@@ -301,7 +193,7 @@ export default function CommentsExample() {
           <Pendu gap={16} seed={seed}>
             {visible.map((photo) => (
               <Pendu.Item
-                key={photo.slotKey}
+                key={photo.id}
                 width={photo.width}
                 height={photo.height}
               >
