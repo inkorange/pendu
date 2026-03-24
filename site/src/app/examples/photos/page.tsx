@@ -34,8 +34,8 @@ function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
   const [current, setCurrent] = useState(src);
   const [previous, setPrevious] = useState<string | null>(null);
   const [phase, setPhase] = useState<"idle" | "start" | "animate">("idle");
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const rafRef = useRef<number>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (src === current) return;
