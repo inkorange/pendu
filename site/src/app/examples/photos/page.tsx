@@ -141,7 +141,7 @@ export default function PhotosExample() {
           </button>
         </div>
         <div className="flex-1 mx-[5vw] mb-[5vh]">
-          <Pendu gap={10} seed={42}>
+          <Pendu gap={16} seed={42}>
             {visible.map((photo) => (
               <Pendu.Item
                 key={photo.slotKey}
