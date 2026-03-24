@@ -27,19 +27,34 @@ const allPhotos = [
 const VISIBLE_COUNT = 8;
 const ROTATE_INTERVAL = 3000;
 
+// Build slots with stable keys — the key stays, only the photo swaps
+function buildSlots(photos: typeof allPhotos) {
+  return photos.map((photo, i) => ({
+    ...photo,
+    slotKey: `slot-${i}`,
+  }));
+}
+
 export default function PhotosExample() {
-  const [visible, setVisible] = useState(allPhotos.slice(0, VISIBLE_COUNT));
+  const [visible, setVisible] = useState(() => buildSlots(allPhotos.slice(0, VISIBLE_COUNT)));
   const [nextIndex, setNextIndex] = useState(VISIBLE_COUNT);
+  const [replaceSlot, setReplaceSlot] = useState(0);
   const [paused, setPaused] = useState(false);
 
   const rotate = useCallback(() => {
     setVisible((prev) => {
       const next = allPhotos[nextIndex % allPhotos.length];
-      // Remove first, add next at end
-      return [...prev.slice(1), { ...next, id: `${next.id}-${Date.now()}` }];
+      // Replace one slot in-place — other slots keep their position
+      const updated = [...prev];
+      updated[replaceSlot] = {
+        ...next,
+        slotKey: `slot-${replaceSlot}`,
+      };
+      return updated;
     });
     setNextIndex((i) => i + 1);
-  }, [nextIndex]);
+    setReplaceSlot((s) => (s + 1) % VISIBLE_COUNT);
+  }, [nextIndex, replaceSlot]);
 
   useEffect(() => {
     if (paused) return;
@@ -66,7 +81,7 @@ export default function PhotosExample() {
           <Pendu gap={10} seed={42}>
             {visible.map((photo) => (
               <Pendu.Image
-                key={photo.id}
+                key={photo.slotKey}
                 src={photo.src}
                 width={photo.width}
                 height={photo.height}
