@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useId } from "react";
 import { Pendu } from "@inkorange/pendu";
 import { Nav } from "@/components/Nav";
 
@@ -28,83 +28,66 @@ const VISIBLE_COUNT = 8;
 const ROTATE_INTERVAL = 3000;
 const TRANSITION_MS = 800;
 
-// Crossfade image component — when src changes, the old image fades/zooms out
-// while the new one fades/zooms in
+// Crossfade image using CSS keyframes — no React state timing issues
 function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
-  const [current, setCurrent] = useState(src);
-  const [previous, setPrevious] = useState<string | null>(null);
-  const [phase, setPhase] = useState<"idle" | "start" | "animate">("idle");
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
-  const rafRef = useRef<number>();
+  const [layers, setLayers] = useState([{ src, key: 0 }]);
+  const counterRef = useRef(0);
 
   useEffect(() => {
-    if (src === current) return;
+    if (src === layers[layers.length - 1].src) return;
 
-    // Phase 1: render new image at starting position (opacity 0, scale 0.9)
-    setPrevious(current);
-    setCurrent(src);
-    setPhase("start");
+    counterRef.current += 1;
+    const newKey = counterRef.current;
 
-    // Phase 2: after browser paints the "start" state, flip to "animate"
-    // Double rAF ensures the browser has committed the initial styles
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = requestAnimationFrame(() => {
-        setPhase("animate");
-      });
-    });
+    // Add new layer on top
+    setLayers((prev) => [...prev, { src, key: newKey }]);
 
-    // Phase 3: clean up after transition completes
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      setPrevious(null);
-      setPhase("idle");
-    }, TRANSITION_MS + 50);
+    // Remove old layer after animation completes
+    const timer = setTimeout(() => {
+      setLayers((prev) => prev.filter((l) => l.key === newKey));
+    }, TRANSITION_MS + 100);
 
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    };
-  }, [src, current]);
-
-  const imgBase: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-  };
-
-  const transition = `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`;
-  const isTransitioning = phase === "start" || phase === "animate";
+    return () => clearTimeout(timer);
+  }, [src, layers]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-      {/* Previous image — fades out and zooms up */}
-      {previous && (
-        <img
-          src={previous}
-          alt=""
-          style={{
-            ...imgBase,
-            zIndex: 1,
-            transition: phase === "animate" ? transition : "none",
-            opacity: phase === "animate" ? 0 : 1,
-            transform: phase === "animate" ? "scale(1.15)" : "scale(1)",
-          }}
-        />
-      )}
-      {/* Current image — zooms in from slightly small and fades in */}
-      <img
-        src={current}
-        alt={alt}
-        style={{
-          ...imgBase,
-          zIndex: isTransitioning ? 0 : 1,
-          transition: phase === "animate" ? transition : "none",
-          opacity: phase === "start" ? 0 : 1,
-          transform: phase === "start" ? "scale(0.85)" : "scale(1)",
-        }}
-      />
+      <style>{`
+        @keyframes pendu-fade-in {
+          from { opacity: 0; transform: scale(0.85); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes pendu-fade-out {
+          from { opacity: 1; transform: scale(1); }
+          to { opacity: 0; transform: scale(1.1); }
+        }
+      `}</style>
+      {layers.map((layer, i) => {
+        const isTop = i === layers.length - 1;
+        const isAnimatingIn = layers.length > 1 && isTop;
+        const isAnimatingOut = layers.length > 1 && !isTop;
+
+        return (
+          <img
+            key={layer.key}
+            src={layer.src}
+            alt={isTop ? alt : ""}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              zIndex: i,
+              animation: isAnimatingIn
+                ? `pendu-fade-in ${TRANSITION_MS}ms ease forwards`
+                : isAnimatingOut
+                  ? `pendu-fade-out ${TRANSITION_MS}ms ease forwards`
+                  : "none",
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -158,7 +141,7 @@ export default function PhotosExample() {
           </button>
         </div>
         <div className="flex-1 mx-[5vw] mb-[5vh]">
-          <Pendu gap={10} seed={42}>
+          <Pendu gap={16} seed={42}>
             {visible.map((photo) => (
               <Pendu.Item
                 key={photo.slotKey}
