@@ -29,8 +29,45 @@ const VISIBLE_COUNT = 6;
 const ROTATE_INTERVAL = 3000;
 const TRANSITION_MS = 800;
 
-function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
-  const [layers, setLayers] = useState([{ src, key: 0 }]);
+// Determines slide direction based on the card's position in the viewport.
+// Cards slide toward the nearest edge — left cards slide left, right cards
+// slide right, etc. The incoming image slides in from the opposite side.
+function getSlideDirection(el: HTMLElement): { outX: string; outY: string; inX: string; inY: string } {
+  const rect = el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Normalized position: 0 = left/top edge, 1 = right/bottom edge
+  const nx = cx / vw;
+  const ny = cy / vh;
+
+  // Distance from center (0.5) on each axis
+  const dx = nx - 0.5;
+  const dy = ny - 0.5;
+
+  // Pick the axis with the stronger bias
+  if (Math.abs(dx) > Math.abs(dy)) {
+    // Slide horizontally
+    const dir = dx > 0 ? 1 : -1;
+    return {
+      outX: `${dir * 120}%`, outY: "0",
+      inX: `${-dir * 80}%`, inY: "0",
+    };
+  } else {
+    // Slide vertically
+    const dir = dy > 0 ? 1 : -1;
+    return {
+      outX: "0", outY: `${dir * 120}%`,
+      inX: "0", inY: `${-dir * 80}%`,
+    };
+  }
+}
+
+function SlideSwapImage({ src, alt }: { src: string; alt: string }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [layers, setLayers] = useState([{ src, key: 0, slideDir: null as ReturnType<typeof getSlideDirection> | null }]);
   const counterRef = useRef(0);
 
   useEffect(() => {
@@ -39,7 +76,12 @@ function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
     counterRef.current += 1;
     const newKey = counterRef.current;
 
-    setLayers((prev) => [...prev, { src, key: newKey }]);
+    // Compute slide direction from the card's current viewport position
+    const dir = containerRef.current ? getSlideDirection(containerRef.current) : {
+      outX: "120%", outY: "0", inX: "-80%", inY: "0",
+    };
+
+    setLayers((prev) => [...prev, { src, key: newKey, slideDir: dir }]);
 
     const timer = setTimeout(() => {
       setLayers((prev) => prev.filter((l) => l.key === newKey));
@@ -48,22 +90,28 @@ function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
     return () => clearTimeout(timer);
   }, [src, layers]);
 
+  // Generate unique keyframe names per layer to avoid conflicts
+  const keyframes = layers
+    .filter((l) => l.slideDir)
+    .map((l) => `
+      @keyframes slide-out-${l.key} {
+        from { opacity: 1; transform: translate(0, 0); }
+        to { opacity: 0; transform: translate(${l.slideDir!.outX}, ${l.slideDir!.outY}); }
+      }
+      @keyframes slide-in-${l.key} {
+        from { opacity: 0; transform: translate(${l.slideDir!.inX}, ${l.slideDir!.inY}); }
+        to { opacity: 1; transform: translate(0, 0); }
+      }
+    `)
+    .join("\n");
+
   return (
-    <>
-      <style>{`
-        @keyframes card-fade-in {
-          from { opacity: 0; transform: scale(0.85); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes card-fade-out {
-          from { opacity: 1; transform: scale(1); }
-          to { opacity: 0; transform: scale(1.1); }
-        }
-      `}</style>
+    <div ref={containerRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+      <style>{keyframes}</style>
       {layers.map((layer, i) => {
         const isTop = i === layers.length - 1;
-        const isAnimatingIn = layers.length > 1 && isTop;
-        const isAnimatingOut = layers.length > 1 && !isTop;
+        const isAnimatingIn = layers.length > 1 && isTop && layer.slideDir;
+        const isAnimatingOut = layers.length > 1 && !isTop && layer.slideDir;
 
         return (
           <img
@@ -78,15 +126,15 @@ function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
               objectFit: "cover",
               zIndex: i,
               animation: isAnimatingIn
-                ? `card-fade-in ${TRANSITION_MS}ms ease forwards`
+                ? `slide-in-${layer.key} ${TRANSITION_MS}ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards`
                 : isAnimatingOut
-                  ? `card-fade-out ${TRANSITION_MS}ms ease forwards`
+                  ? `slide-out-${layer.key} ${TRANSITION_MS}ms cubic-bezier(0.25, 0.1, 0.25, 1) forwards`
                   : "none",
             }}
           />
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -115,7 +163,7 @@ function SocialCard({
       }}
     >
       <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-        <CrossfadeImage src={src} alt={alt} />
+        <SlideSwapImage src={src} alt={alt} />
 
         {/* Gradient overlay at top */}
         <div
