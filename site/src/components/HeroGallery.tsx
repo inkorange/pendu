@@ -29,7 +29,7 @@ export function HeroGallery() {
 
   return (
     <div>
-      <div className="flex items-center gap-6 mb-4">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-6 mb-4">
         <div className="flex items-center gap-3 flex-1">
           <label className="text-sm text-[var(--text-muted)] whitespace-nowrap">
             Images: {count}
@@ -50,7 +50,7 @@ export function HeroGallery() {
           Shuffle Layout
         </button>
       </div>
-      <div className="w-full h-[500px] rounded-xl overflow-hidden border border-[var(--border)]">
+      <div className="w-full h-[300px] sm:h-[400px] md:h-[500px] rounded-xl overflow-hidden border border-[var(--border)]">
         <Pendu gap={8} seed={seed}>
           {visibleImages.map((img) => (
             <Pendu.Image
