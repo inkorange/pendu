@@ -89,7 +89,7 @@ export default function Home() {
             <div className="flex justify-center mb-6">
               <Image src="/pendu.png" alt="Pendu" width={280} height={100} priority />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-4">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
               Organic gallery layouts
               {" "}<span className="text-[var(--accent)]">for React</span>
             </h1>
