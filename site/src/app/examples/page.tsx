@@ -74,6 +74,12 @@ export default function Examples() {
             >
               Photo Gallery →
             </a>
+            <a
+              href="/examples/comments"
+              className="px-4 py-2 rounded-lg border border-[var(--border)] text-sm text-[var(--text-muted)] hover:text-[var(--text)] hover:border-[var(--text-muted)] transition-colors"
+            >
+              Social Cards →
+            </a>
           </div>
 
           {/* Dynamic add/remove */}
