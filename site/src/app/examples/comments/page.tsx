@@ -185,7 +185,7 @@ function SocialCard({
           <p
             style={{
               color: "#fff",
-              fontSize: 12,
+              fontSize: 14,
               fontWeight: 400,
               lineHeight: 1.4,
               margin: 0,
