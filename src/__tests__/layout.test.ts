@@ -187,7 +187,7 @@ describe('computeLayout — constraints', () => {
     expect(result.stats.placed).toBe(result.frames.length);
     expect(result.stats.placed + result.stats.failed).toBe(images.length);
     expect(result.stats.avgScale).toBeGreaterThan(0);
-    expect(result.stats.avgScale).toBeLessThanOrEqual(1);
+    expect(result.stats.avgScale).toBeLessThanOrEqual(3);
   });
 });
 

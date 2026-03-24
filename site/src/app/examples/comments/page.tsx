@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Pendu } from "@inkorange/pendu";
 import { Nav } from "@/components/Nav";
 
@@ -29,8 +29,76 @@ const VISIBLE_COUNT = 6;
 const ROTATE_INTERVAL = 3000;
 const TRANSITION_MS = 800;
 
+type PhotoData = (typeof allPhotos)[number];
 
-function SocialCard({
+// Wraps the entire card content and handles zoom+fade transitions
+// when the photo data changes within a stable slot.
+function ZoomCard({ photo }: { photo: PhotoData }) {
+  const [layers, setLayers] = useState([{ photo, key: 0 }]);
+  const counterRef = useRef(0);
+  const prevIdRef = useRef(photo.id);
+
+  useEffect(() => {
+    if (photo.id === prevIdRef.current) return;
+    prevIdRef.current = photo.id;
+
+    counterRef.current += 1;
+    const newKey = counterRef.current;
+
+    setLayers((prev) => [...prev, { photo, key: newKey }]);
+
+    const timer = setTimeout(() => {
+      setLayers((prev) => prev.filter((l) => l.key === newKey));
+    }, TRANSITION_MS + 100);
+
+    return () => clearTimeout(timer);
+  }, [photo]);
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+      <style>{`
+        @keyframes card-zoom-in {
+          from { opacity: 0; transform: scale(0.85); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes card-zoom-out {
+          from { opacity: 1; transform: scale(1); }
+          to { opacity: 0; transform: scale(1.15); }
+        }
+      `}</style>
+      {layers.map((layer, i) => {
+        const isTop = i === layers.length - 1;
+        const isAnimatingIn = layers.length > 1 && isTop;
+        const isAnimatingOut = layers.length > 1 && !isTop;
+
+        return (
+          <div
+            key={layer.key}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: i,
+              animation: isAnimatingIn
+                ? `card-zoom-in ${TRANSITION_MS}ms ease forwards`
+                : isAnimatingOut
+                  ? `card-zoom-out ${TRANSITION_MS}ms ease forwards`
+                  : "none",
+            }}
+          >
+            <CardContent
+              src={layer.photo.src}
+              handle={layer.photo.handle}
+              caption={layer.photo.caption}
+              alt={layer.photo.alt}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CardContent({
   src,
   handle,
   caption,
@@ -98,7 +166,6 @@ function SocialCard({
             WebkitBackdropFilter: "blur(8px)",
           }}
         >
-          {/* Avatar circle */}
           <div
             style={{
               width: 18,
@@ -150,9 +217,16 @@ function SocialCard({
   );
 }
 
+function buildSlots(photos: typeof allPhotos) {
+  return photos.map((photo, i) => ({
+    ...photo,
+    slotKey: `slot-${i}`,
+  }));
+}
+
 export default function CommentsExample() {
   const [seed] = useState(() => Math.floor(Math.random() * 100000));
-  const [visible, setVisible] = useState(allPhotos.slice(0, VISIBLE_COUNT));
+  const [visible, setVisible] = useState(() => buildSlots(allPhotos.slice(0, VISIBLE_COUNT)));
   const [nextIndex, setNextIndex] = useState(VISIBLE_COUNT);
   const [replaceSlot, setReplaceSlot] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -161,7 +235,10 @@ export default function CommentsExample() {
     setVisible((prev) => {
       const next = allPhotos[nextIndex % allPhotos.length];
       const updated = [...prev];
-      updated[replaceSlot] = next;
+      updated[replaceSlot] = {
+        ...next,
+        slotKey: `slot-${replaceSlot}`,
+      };
       return updated;
     });
     setNextIndex((i) => i + 1);
@@ -190,19 +267,14 @@ export default function CommentsExample() {
           </button>
         </div>
         <div className="flex-1 mx-[5vw] mb-[5vh]">
-          <Pendu gap={16} seed={seed} animationDuration={2000} {...{ animationStyle: "slide" } as Record<string, unknown>}>
+          <Pendu gap={16} seed={seed}>
             {visible.map((photo) => (
               <Pendu.Item
-                key={photo.id}
+                key={photo.slotKey}
                 width={photo.width}
                 height={photo.height}
               >
-                <SocialCard
-                  src={photo.src}
-                  handle={photo.handle}
-                  caption={photo.caption}
-                  alt={photo.alt}
-                />
+                <ZoomCard photo={photo} />
               </Pendu.Item>
             ))}
           </Pendu>

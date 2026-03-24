@@ -35,8 +35,6 @@ const CSS_VAR_DEFAULTS: Record<string, string> = {
 // Types
 // ---------------------------------------------------------------------------
 
-export type PenduAnimationStyle = 'scale' | 'slide' | 'fade';
-
 export interface PenduProps {
   gap?: number;
   minScale?: number;
@@ -44,7 +42,6 @@ export interface PenduProps {
   seed?: number;
   animate?: boolean;
   animationDuration?: number;
-  animationStyle?: PenduAnimationStyle;
   className?: string;
   style?: React.CSSProperties;
   children: React.ReactNode;
@@ -112,7 +109,6 @@ function PenduComponent({
   seed,
   animate = true,
   animationDuration = 300,
-  animationStyle = 'scale',
   className,
   style,
   children,
@@ -127,7 +123,6 @@ function PenduComponent({
   // FLIP animation state
   const prevSnapshotsRef = useRef<Map<string, FrameSnapshot>>(new Map());
   const prevKeysRef = useRef<Set<string>>(new Set());
-  const prevElementsRef = useRef<Map<string, HTMLElement>>(new Map());
   const isFirstRenderRef = useRef(true);
 
   const effectiveSeed = seed ?? seedRef.current;
@@ -318,21 +313,6 @@ function PenduComponent({
     const prevSnapshots = prevSnapshotsRef.current;
     const easing = 'cubic-bezier(0.25, 0.1, 0.25, 1)';
 
-    // Compute slide direction for an element based on its position relative to the container center
-    const getSlideTransform = (left: number, top: number, width: number, height: number): string => {
-      const containerW = innerRef.current?.offsetWidth ?? 1;
-      const containerH = innerRef.current?.offsetHeight ?? 1;
-      const cx = (left + width / 2) / containerW;
-      const cy = (top + height / 2) / containerH;
-      const dx = cx - 0.5;
-      const dy = cy - 0.5;
-
-      if (Math.abs(dx) > Math.abs(dy)) {
-        return dx > 0 ? `translateX(${width}px)` : `translateX(-${width}px)`;
-      }
-      return dy > 0 ? `translateY(${height}px)` : `translateY(-${height}px)`;
-    };
-
     frameEls.forEach((el) => {
       const key = el.dataset.penduKey;
       if (!key) return;
@@ -345,19 +325,11 @@ function PenduComponent({
       if (!prev || !prevKeys.has(key)) {
         // ENTER
         el.style.transition = 'none';
-        if (animationStyle === 'slide') {
-          el.style.transform = getSlideTransform(curr.left, curr.top, curr.width, curr.height);
-          el.style.opacity = '0';
-        } else if (animationStyle === 'fade') {
-          el.style.transform = '';
-          el.style.opacity = '0';
-        } else {
-          el.style.transform = 'scale(0.7)';
-          el.style.opacity = '0';
-        }
+        el.style.transform = 'scale(0.7)';
+        el.style.opacity = '0';
         void el.offsetHeight;
         el.style.transition = `transform ${animationDuration}ms ${easing}, opacity ${animationDuration}ms ${easing}`;
-        el.style.transform = animationStyle === 'fade' ? '' : 'scale(1) translate(0, 0)';
+        el.style.transform = 'scale(1)';
         el.style.opacity = '1';
         const cleanup = () => { el.style.removeProperty('transition'); el.style.removeProperty('transform'); el.style.removeProperty('opacity'); el.removeEventListener('transitionend', cleanup); };
         el.addEventListener('transitionend', cleanup, { once: true });
@@ -378,58 +350,27 @@ function PenduComponent({
       el.addEventListener('transitionend', cleanup, { once: true });
     });
 
-    // EXIT — clone previous elements for removed frames
+    // EXIT — ghost elements for removed frames
     prevKeys.forEach((key) => {
       if (currentKeys.has(key)) return;
       const prev = prevSnapshots.get(key);
       if (!prev || !inner) return;
 
-      // Try to use the cached clone of the actual element
-      const cachedEl = prevElementsRef.current.get(key);
-      const ghost = cachedEl ? cachedEl.cloneNode(true) as HTMLElement : document.createElement('div');
-
-      ghost.className = (ghost.className || '') + ' pendu-frame--exiting';
-      ghost.style.position = 'absolute';
-      ghost.style.left = `${prev.left}px`;
-      ghost.style.top = `${prev.top}px`;
-      ghost.style.width = `${prev.width}px`;
-      ghost.style.height = `${prev.height}px`;
-      ghost.style.pointerEvents = 'none';
-      ghost.style.opacity = '1';
-      ghost.style.transition = 'none';
-      ghost.style.overflow = 'hidden';
-
-      if (!cachedEl) {
-        ghost.style.background = 'var(--pendu-skeleton-bg, #e0e0e0)';
-        ghost.style.borderRadius = 'var(--pendu-frame-radius, 0)';
-      }
-
+      const ghost = document.createElement('div');
+      ghost.className = 'pendu-frame pendu-frame--exiting';
+      ghost.style.cssText = `position:absolute;left:${prev.left}px;top:${prev.top}px;width:${prev.width}px;height:${prev.height}px;background:var(--pendu-skeleton-bg,#e0e0e0);border-radius:var(--pendu-frame-radius,0);box-shadow:var(--pendu-frame-shadow,none);overflow:hidden;pointer-events:none;opacity:1;transform:scale(1);transition:none;`;
       inner.appendChild(ghost);
       void ghost.offsetHeight;
       ghost.style.transition = `transform ${animationDuration}ms ${easing}, opacity ${animationDuration}ms ${easing}`;
-      if (animationStyle === 'slide') {
-        ghost.style.transform = getSlideTransform(prev.left, prev.top, prev.width, prev.height);
-      } else if (animationStyle === 'fade') {
-        // no transform, just fade
-      } else {
-        ghost.style.transform = 'scale(0.7)';
-      }
+      ghost.style.transform = 'scale(0.7)';
       ghost.style.opacity = '0';
       ghost.addEventListener('transitionend', () => ghost.remove(), { once: true });
       setTimeout(() => ghost.remove(), animationDuration + 50);
     });
 
-    // Cache current frame elements for next exit animation
-    const elementMap = new Map<string, HTMLElement>();
-    frameEls.forEach((el) => {
-      const key = el.dataset.penduKey;
-      if (key) elementMap.set(key, el);
-    });
-    prevElementsRef.current = elementMap;
-
     prevSnapshotsRef.current = new Map(currentSnapshots);
     prevKeysRef.current = currentKeys;
-  }, [layout, animate, animationDuration, animationStyle, childItems, currentSnapshots]);
+  }, [layout, animate, animationDuration, childItems, currentSnapshots]);
 
   // ---------------------------------------------------------------------------
   // Render
