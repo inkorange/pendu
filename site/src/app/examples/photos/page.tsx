@@ -33,29 +33,40 @@ const TRANSITION_MS = 800;
 function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
   const [current, setCurrent] = useState(src);
   const [previous, setPrevious] = useState<string | null>(null);
-  const [transitioning, setTransitioning] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "start" | "animate">("idle");
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const rafRef = useRef<number>();
 
   useEffect(() => {
     if (src === current) return;
 
-    // Start transition: show old image fading out, new image fading in
+    // Phase 1: render new image at starting position (opacity 0, scale 0.9)
     setPrevious(current);
     setCurrent(src);
-    setTransitioning(true);
+    setPhase("start");
 
+    // Phase 2: after browser paints the "start" state, flip to "animate"
+    // Double rAF ensures the browser has committed the initial styles
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = requestAnimationFrame(() => {
+        setPhase("animate");
+      });
+    });
+
+    // Phase 3: clean up after transition completes
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       setPrevious(null);
-      setTransitioning(false);
-    }, TRANSITION_MS);
+      setPhase("idle");
+    }, TRANSITION_MS + 50);
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [src, current]);
 
-  const imgStyle: React.CSSProperties = {
+  const imgBase: React.CSSProperties = {
     position: "absolute",
     inset: 0,
     width: "100%",
@@ -63,40 +74,35 @@ function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
     objectFit: "cover",
   };
 
+  const transition = `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`;
+  const isTransitioning = phase === "start" || phase === "animate";
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-      {/* Previous image — fades and zooms out */}
+      {/* Previous image — fades out and zooms up */}
       {previous && (
         <img
           src={previous}
           alt=""
           style={{
-            ...imgStyle,
-            transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
-            opacity: transitioning ? 0 : 1,
-            transform: transitioning ? "scale(1.15)" : "scale(1)",
+            ...imgBase,
+            zIndex: 1,
+            transition: phase === "animate" ? transition : "none",
+            opacity: phase === "animate" ? 0 : 1,
+            transform: phase === "animate" ? "scale(1.15)" : "scale(1)",
           }}
         />
       )}
-      {/* Current image — fades and zooms in */}
+      {/* Current image — zooms in from slightly small and fades in */}
       <img
         src={current}
         alt={alt}
         style={{
-          ...imgStyle,
-          transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
-          opacity: transitioning && previous ? 0 : 1,
-          transform: transitioning && previous ? "scale(0.9)" : "scale(1)",
-        }}
-        onLoad={(e) => {
-          // Once loaded, trigger the fade in
-          if (transitioning && previous) {
-            requestAnimationFrame(() => {
-              const el = e.currentTarget;
-              el.style.opacity = "1";
-              el.style.transform = "scale(1)";
-            });
-          }
+          ...imgBase,
+          zIndex: isTransitioning ? 0 : 1,
+          transition: phase === "animate" ? transition : "none",
+          opacity: phase === "start" ? 0 : 1,
+          transform: phase === "start" ? "scale(0.85)" : "scale(1)",
         }}
       />
     </div>
