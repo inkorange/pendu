@@ -24,6 +24,10 @@
   <a href="https://github.com/inkorange/pendu/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@inkorange/pendu" alt="license" /></a>
 </p>
 
+<p align="center">
+  <img src="resources/pendu.gif" alt="Pendu demo — organic gallery layout with animated transitions" width="700" />
+</p>
+
 ## Install
 
 ```bash
