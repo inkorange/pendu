@@ -208,6 +208,7 @@ function buildSlots(photos: typeof allPhotos) {
 }
 
 export default function CommentsExample() {
+  const [seed] = useState(() => Math.floor(Math.random() * 100000));
   const [visible, setVisible] = useState(() => buildSlots(allPhotos.slice(0, VISIBLE_COUNT)));
   const [nextIndex, setNextIndex] = useState(VISIBLE_COUNT);
   const [replaceSlot, setReplaceSlot] = useState(0);
@@ -249,7 +250,7 @@ export default function CommentsExample() {
           </button>
         </div>
         <div className="flex-1 mx-[5vw] mb-[5vh]">
-          <Pendu gap={16} seed={77}>
+          <Pendu gap={16} seed={seed}>
             {visible.map((photo) => (
               <Pendu.Item
                 key={photo.slotKey}
