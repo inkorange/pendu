@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Pendu } from "@inkorange/pendu";
 import { Nav } from "@/components/Nav";
 
@@ -26,8 +26,83 @@ const allPhotos = [
 
 const VISIBLE_COUNT = 8;
 const ROTATE_INTERVAL = 3000;
+const TRANSITION_MS = 800;
 
-// Build slots with stable keys — the key stays, only the photo swaps
+// Crossfade image component — when src changes, the old image fades/zooms out
+// while the new one fades/zooms in
+function CrossfadeImage({ src, alt }: { src: string; alt: string }) {
+  const [current, setCurrent] = useState(src);
+  const [previous, setPrevious] = useState<string | null>(null);
+  const [transitioning, setTransitioning] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (src === current) return;
+
+    // Start transition: show old image fading out, new image fading in
+    setPrevious(current);
+    setCurrent(src);
+    setTransitioning(true);
+
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setPrevious(null);
+      setTransitioning(false);
+    }, TRANSITION_MS);
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [src, current]);
+
+  const imgStyle: React.CSSProperties = {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+  };
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+      {/* Previous image — fades and zooms out */}
+      {previous && (
+        <img
+          src={previous}
+          alt=""
+          style={{
+            ...imgStyle,
+            transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
+            opacity: transitioning ? 0 : 1,
+            transform: transitioning ? "scale(1.15)" : "scale(1)",
+          }}
+        />
+      )}
+      {/* Current image — fades and zooms in */}
+      <img
+        src={current}
+        alt={alt}
+        style={{
+          ...imgStyle,
+          transition: `opacity ${TRANSITION_MS}ms ease, transform ${TRANSITION_MS}ms ease`,
+          opacity: transitioning && previous ? 0 : 1,
+          transform: transitioning && previous ? "scale(0.9)" : "scale(1)",
+        }}
+        onLoad={(e) => {
+          // Once loaded, trigger the fade in
+          if (transitioning && previous) {
+            requestAnimationFrame(() => {
+              const el = e.currentTarget;
+              el.style.opacity = "1";
+              el.style.transform = "scale(1)";
+            });
+          }
+        }}
+      />
+    </div>
+  );
+}
+
 function buildSlots(photos: typeof allPhotos) {
   return photos.map((photo, i) => ({
     ...photo,
@@ -44,7 +119,6 @@ export default function PhotosExample() {
   const rotate = useCallback(() => {
     setVisible((prev) => {
       const next = allPhotos[nextIndex % allPhotos.length];
-      // Replace one slot in-place — other slots keep their position
       const updated = [...prev];
       updated[replaceSlot] = {
         ...next,
@@ -80,13 +154,13 @@ export default function PhotosExample() {
         <div className="flex-1 mx-[5vw] mb-[5vh]">
           <Pendu gap={10} seed={42}>
             {visible.map((photo) => (
-              <Pendu.Image
+              <Pendu.Item
                 key={photo.slotKey}
-                src={photo.src}
                 width={photo.width}
                 height={photo.height}
-                alt={photo.alt}
-              />
+              >
+                <CrossfadeImage src={photo.src} alt={photo.alt} />
+              </Pendu.Item>
             ))}
           </Pendu>
         </div>
