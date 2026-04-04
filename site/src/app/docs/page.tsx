@@ -9,6 +9,10 @@ const propsTable = [
   { prop: "gap", type: "number", default: "8", description: "Space between images in pixels" },
   { prop: "seed", type: "number", default: "42", description: "Random seed for deterministic layouts. Same seed = same layout." },
   { prop: "padding", type: "number", default: "0", description: "Inner padding of the gallery container" },
+  { prop: "lazy", type: "boolean", default: "false", description: "Enable native lazy loading on all images" },
+  { prop: "minItemWidth", type: "number", default: "—", description: "Minimum frame width in pixels (preserves aspect ratio)" },
+  { prop: "maxItemWidth", type: "number", default: "—", description: "Maximum frame width in pixels (preserves aspect ratio)" },
+  { prop: "onLayoutChange", type: "(result: LayoutResult) => void", default: "—", description: "Callback fired after each layout computation" },
   { prop: "className", type: "string", default: "—", description: "CSS class applied to the gallery root element" },
 ];
 
@@ -17,6 +21,7 @@ const imagePropsTable = [
   { prop: "width", type: "number", default: "required", description: "Original image width (for aspect ratio)" },
   { prop: "height", type: "number", default: "required", description: "Original image height (for aspect ratio)" },
   { prop: "alt", type: "string", default: '""', description: "Alt text for accessibility" },
+  { prop: "loading", type: "'lazy' | 'eager'", default: "—", description: "Native image loading strategy (overrides Pendu lazy prop)" },
 ];
 
 const itemPropsTable = [
