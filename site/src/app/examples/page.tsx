@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Pendu } from "@inkorange/pendu";
+import type { LayoutResult } from "@inkorange/pendu";
 import { Nav } from "@/components/Nav";
 import { CodeBlock } from "@/components/CodeBlock";
 
@@ -51,10 +52,36 @@ const containerCode = `{/* Fixed height — gallery scales to fit */}
   <Pendu gap={8}>{...}</Pendu>
 </div>`;
 
+const lazyCode = `// All images lazy-loaded
+<Pendu lazy gap={12}>
+  <Pendu.Image src="/photo.jpg" width={1200} height={800} alt="Photo" />
+</Pendu>
+
+// Per-image control
+<Pendu gap={12}>
+  <Pendu.Image src="/hero.jpg" width={1200} height={800} loading="eager" />
+  <Pendu.Image src="/below.jpg" width={800} height={1200} loading="lazy" />
+</Pendu>`;
+
+const sizeCode = `<Pendu gap={12} minItemWidth={120} maxItemWidth={400}>
+  <Pendu.Image src="/portrait.jpg" width={800} height={1200} />
+  <Pendu.Image src="/panorama.jpg" width={2400} height={600} />
+</Pendu>`;
+
+const callbackCode = `<Pendu gap={12} onLayoutChange={(result) => {
+  console.log(\`Placed \${result.stats.placed} frames\`);
+  console.log('Bounds:', result.bounds);
+}}>
+  <Pendu.Image src="/photo.jpg" width={1200} height={800} />
+</Pendu>`;
+
 export default function Examples() {
   const [count, setCount] = useState(5);
   const [gap, setGap] = useState(12);
   const [seed, setSeed] = useState(42);
+  const [minWidth, setMinWidth] = useState(0);
+  const [maxWidth, setMaxWidth] = useState(500);
+  const [layoutInfo, setLayoutInfo] = useState<LayoutResult | null>(null);
   const visibleImages = allImages.slice(0, count);
 
   return (
@@ -215,6 +242,126 @@ export default function Examples() {
               </div>
             </div>
             <CodeBlock code={containerCode} language="tsx" filename="ContainerModes.tsx" />
+          </section>
+
+          {/* Size constraints */}
+          <section className="mb-20">
+            <h2 className="text-2xl font-bold mb-2">Size Constraints</h2>
+            <p className="text-[var(--text-muted)] mb-6">
+              Control minimum and maximum frame widths. Useful for keeping portrait
+              images visible and wide panoramas in check.
+            </p>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 mb-6">
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-[var(--text-muted)]">
+                  Min: {minWidth}px
+                </label>
+                <input
+                  type="range"
+                  min={0}
+                  max={300}
+                  value={minWidth}
+                  onChange={(e) => setMinWidth(Number(e.target.value))}
+                  className="w-32"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-[var(--text-muted)]">
+                  Max: {maxWidth}px
+                </label>
+                <input
+                  type="range"
+                  min={100}
+                  max={500}
+                  value={maxWidth}
+                  onChange={(e) => setMaxWidth(Number(e.target.value))}
+                  className="w-32"
+                />
+              </div>
+            </div>
+            <div className="h-[400px] rounded-xl overflow-hidden border border-[var(--border)] mb-6">
+              <Pendu
+                gap={12}
+                seed={42}
+                minItemWidth={minWidth > 0 ? minWidth : undefined}
+                maxItemWidth={maxWidth < 500 ? maxWidth : undefined}
+              >
+                {allImages.map((img) => (
+                  <Pendu.Image
+                    key={img.id}
+                    src={img.src}
+                    width={img.width}
+                    height={img.height}
+                    alt={img.alt}
+                  />
+                ))}
+              </Pendu>
+            </div>
+            <CodeBlock code={sizeCode} language="tsx" filename="SizeConstraints.tsx" />
+          </section>
+
+          {/* Layout callback */}
+          <section className="mb-20">
+            <h2 className="text-2xl font-bold mb-2">Layout Callback</h2>
+            <p className="text-[var(--text-muted)] mb-6">
+              Subscribe to layout changes with <code className="text-xs bg-[var(--code-bg)] px-1.5 py-0.5 rounded">onLayoutChange</code>.
+              Useful for lightboxes, tooltips, or analytics.
+            </p>
+            <div className="h-[400px] rounded-xl overflow-hidden border border-[var(--border)] mb-6">
+              <Pendu gap={gap} seed={seed} onLayoutChange={setLayoutInfo}>
+                {visibleImages.map((img) => (
+                  <Pendu.Image
+                    key={img.id}
+                    src={img.src}
+                    width={img.width}
+                    height={img.height}
+                    alt={img.alt}
+                  />
+                ))}
+              </Pendu>
+            </div>
+            {layoutInfo && (
+              <div className="rounded-xl border border-[var(--border)] p-4 mb-6 font-mono text-xs text-[var(--text-muted)]">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <span className="text-[var(--text)]">{layoutInfo.stats.placed}</span> frames placed
+                  </div>
+                  <div>
+                    <span className="text-[var(--text)]">{Math.round(layoutInfo.bounds.width)}</span> × <span className="text-[var(--text)]">{Math.round(layoutInfo.bounds.height)}</span>px
+                  </div>
+                  <div>
+                    Avg scale: <span className="text-[var(--text)]">{layoutInfo.stats.avgScale.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    Failed: <span className="text-[var(--text)]">{layoutInfo.stats.failed}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <CodeBlock code={callbackCode} language="tsx" filename="LayoutCallback.tsx" />
+          </section>
+
+          {/* Lazy loading */}
+          <section className="mb-20">
+            <h2 className="text-2xl font-bold mb-2">Lazy Loading</h2>
+            <p className="text-[var(--text-muted)] mb-6">
+              Enable native browser lazy loading with a single prop. Images below the
+              fold load on demand, keeping initial page load fast.
+            </p>
+            <div className="h-[400px] rounded-xl overflow-hidden border border-[var(--border)] mb-6">
+              <Pendu gap={12} seed={42} lazy>
+                {allImages.map((img) => (
+                  <Pendu.Image
+                    key={img.id}
+                    src={img.src}
+                    width={img.width}
+                    height={img.height}
+                    alt={img.alt}
+                  />
+                ))}
+              </Pendu>
+            </div>
+            <CodeBlock code={lazyCode} language="tsx" filename="LazyLoading.tsx" />
           </section>
         </div>
       </main>
