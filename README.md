@@ -18,7 +18,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@inkorange/pendu"><img src="https://img.shields.io/npm/v/@inkorange/pendu" alt="npm version" /></a>
-  <img src="https://img.shields.io/badge/gzipped-5.4%20KB-blue" alt="5.4 KB gzipped" />
+  <img src="https://img.shields.io/badge/gzipped-5.7%20KB-blue" alt="5.7 KB gzipped" />
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="zero dependencies" />
   <img src="https://img.shields.io/badge/coverage-99%25-brightgreen" alt="99% test coverage" />
   <a href="https://github.com/inkorange/pendu/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@inkorange/pendu" alt="license" /></a>
@@ -55,7 +55,10 @@ function Gallery() {
 - **Organic layouts** — No rows, columns, or grids. Images arrange into natural, gallery-wall collages that fill your container.
 - **Animated transitions** — FLIP animations smoothly move content when the gallery changes. Add, remove, or reorder — every transition feels intentional.
 - **Container aware** — Automatically adapts to any container size — fixed, percentage, or viewport units. Content scales and reflows to fill the space.
-- **Tiny footprint** — 5.4 KB gzipped, zero runtime dependencies. Only 6 files installed, nothing beyond React as a peer dependency.
+- **Lazy loading** — Native browser lazy loading with a single prop. Images load on demand, keeping initial page load fast.
+- **Size constraints** — Control frame sizing with `minItemWidth` and `maxItemWidth`. Keep portrait images visible and wide images in check.
+- **Layout callbacks** — Subscribe to layout changes with `onLayoutChange` for lightboxes, tooltips, or custom overlays.
+- **Tiny footprint** — 5.7 KB gzipped, zero runtime dependencies. Only 6 files installed, nothing beyond React as a peer dependency.
 - **CSS variable theming** — Customize gap, radius, and background via `--pendu-*` custom properties. No prop drilling needed.
 - **Deterministic seeds** — Same seed + same inputs = identical layout. Reproducible across renders, servers, and sessions.
 - **TypeScript** — Full type safety with exported interfaces.
@@ -139,6 +142,10 @@ Style without props — set CSS custom properties on the gallery or any ancestor
 | `padding` | `number` | `10` | Inner padding of the gallery |
 | `animate` | `boolean` | `true` | Enable FLIP animations |
 | `animationDuration` | `number` | `300` | Animation duration in ms |
+| `lazy` | `boolean` | `false` | Enable native lazy loading on images |
+| `minItemWidth` | `number` | — | Minimum frame width in pixels |
+| `maxItemWidth` | `number` | — | Maximum frame width in pixels |
+| `onLayoutChange` | `(result: LayoutResult) => void` | — | Callback fired after layout computation |
 | `className` | `string` | — | CSS class on the root element |
 
 ### `<Pendu.Image>` Props
@@ -149,6 +156,7 @@ Style without props — set CSS custom properties on the gallery or any ancestor
 | `width` | `number` | required | Original width (for aspect ratio) |
 | `height` | `number` | required | Original height (for aspect ratio) |
 | `alt` | `string` | `""` | Alt text for accessibility |
+| `loading` | `'lazy' \| 'eager'` | — | Native image loading strategy |
 
 ### `<Pendu.Item>` Props
 
@@ -158,11 +166,76 @@ Style without props — set CSS custom properties on the gallery or any ancestor
 | `height` | `number` | required | Desired height (for aspect ratio) |
 | `children` | `ReactNode` | required | Content to render inside the frame |
 
+## Lazy Loading
+
+Enable native browser lazy loading across all images:
+
+```tsx
+<Pendu lazy gap={12}>
+  <Pendu.Image src="/photo1.jpg" width={1200} height={800} alt="Photo 1" />
+  <Pendu.Image src="/photo2.jpg" width={800} height={1200} alt="Photo 2" />
+</Pendu>
+```
+
+Or control per-image with the `loading` prop on `Pendu.Image`:
+
+```tsx
+<Pendu gap={12}>
+  <Pendu.Image src="/hero.jpg" width={1200} height={800} alt="Hero" loading="eager" />
+  <Pendu.Image src="/below-fold.jpg" width={800} height={1200} alt="Below" loading="lazy" />
+</Pendu>
+```
+
+## Size Constraints
+
+Control how large or small frames can be with `minItemWidth` and `maxItemWidth`:
+
+```tsx
+<Pendu gap={12} minItemWidth={120} maxItemWidth={400}>
+  <Pendu.Image src="/portrait.jpg" width={800} height={1200} alt="Portrait" />
+  <Pendu.Image src="/panorama.jpg" width={2400} height={600} alt="Panorama" />
+</Pendu>
+```
+
+## Layout Callback
+
+React to layout changes — useful for building lightboxes, tooltips, or analytics:
+
+```tsx
+<Pendu gap={12} onLayoutChange={(result) => {
+  console.log(`Placed ${result.stats.placed} frames`);
+  console.log('Bounds:', result.bounds.width, 'x', result.bounds.height);
+}}>
+  <Pendu.Image src="/photo.jpg" width={1200} height={800} alt="Photo" />
+</Pendu>
+```
+
 ## Container Behavior
 
 - **Dynamic height (default):** Gallery grows vertically to fit all content. Container only needs a width.
 - **Fixed height:** When the parent has a fixed height (px, vh, %), the gallery scales to fit both dimensions.
 - **Responsive:** Pendu observes container resizes and re-layouts automatically.
+
+## Changelog
+
+### v0.3.0
+- **`lazy` prop** — Enable native lazy loading on all gallery images with a single prop
+- **`loading` prop on `Pendu.Image`** — Per-image control over lazy/eager loading
+- **`minItemWidth` / `maxItemWidth` props** — Constrain frame sizes while preserving aspect ratios
+- **`onLayoutChange` callback** — Subscribe to layout computation results for building features on top of Pendu
+
+### v0.2.0
+- Social card support with `Pendu.Item` for custom content
+- Photo crossfade and zoom transition examples
+- Improved layout expansion for better space filling
+- Portrait image sizing improvements
+
+### v0.1.0
+- Initial release — organic center-out gallery layout engine
+- FLIP animations for add/remove/reorder transitions
+- CSS variable theming
+- Container-aware sizing with ResizeObserver
+- Deterministic seeded layouts
 
 ## License
 

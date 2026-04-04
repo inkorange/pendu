@@ -189,6 +189,20 @@ describe('computeLayout — constraints', () => {
     expect(result.stats.avgScale).toBeGreaterThan(0);
     expect(result.stats.avgScale).toBeLessThanOrEqual(3);
   });
+
+  it('respects maxItemWidth constraint', () => {
+    const images = [landscape, portrait];
+    const result = computeLayout(images, { ...defaultOpts, maxItemWidth: 150 });
+    expect(result.frames).toHaveLength(2);
+    expect(noOverlaps(result, 16)).toBe(true);
+  });
+
+  it('respects minItemWidth constraint', () => {
+    const images = [landscape, portrait, square, landscape, portrait, square];
+    const result = computeLayout(images, { ...defaultOpts, minItemWidth: 100 });
+    expect(result.frames.length).toBeGreaterThanOrEqual(4);
+    expect(noOverlaps(result, 16)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

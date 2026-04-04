@@ -36,6 +36,8 @@ export function resolveOptions(options?: LayoutOptions): ResolvedOptions {
     seed: options?.seed ?? (Date.now() ^ (Math.random() * 0x100000000)),
     containerWidth: options?.containerWidth ?? 680,
     containerHeight: options?.containerHeight ?? 500,
+    minItemWidth: options?.minItemWidth ?? 0,
+    maxItemWidth: options?.maxItemWidth ?? Infinity,
   };
 }
 
@@ -48,6 +50,8 @@ export function computeBaseSize(
   containerWidth: number,
   containerHeight: number,
   totalImages: number = 1,
+  minItemWidth: number = 0,
+  maxItemWidth: number = Infinity,
 ): { width: number; height: number } {
   const aspect = image.width / image.height;
 
@@ -68,6 +72,16 @@ export function computeBaseSize(
   const maxH = containerHeight * 0.55;
   if (w > maxW) { w = maxW; h = w / aspect; }
   if (h > maxH) { h = maxH; w = h * aspect; }
+
+  // Apply consumer min/max width constraints (preserve aspect ratio)
+  if (maxItemWidth < Infinity && w > maxItemWidth) {
+    w = maxItemWidth;
+    h = w / aspect;
+  }
+  if (minItemWidth > 0 && w < minItemWidth) {
+    w = minItemWidth;
+    h = w / aspect;
+  }
 
   // Minimum size — but don't let it override the max clamp
   const minDim = 40;

@@ -7,6 +7,7 @@ export interface PenduImageProps {
   width: number;
   height: number;
   alt?: string;
+  loading?: 'lazy' | 'eager';
   className?: string;
   style?: React.CSSProperties;
   onClick?: (e: React.MouseEvent) => void;
@@ -19,6 +20,7 @@ export interface PenduImageProps {
 const PenduImage = memo(function PenduImage({
   src,
   alt = '',
+  loading,
   className,
   style,
   onClick,
@@ -50,6 +52,7 @@ const PenduImage = memo(function PenduImage({
       <img
         src={src}
         alt={alt}
+        loading={loading}
         style={{
           display: 'block',
           width: '100%',

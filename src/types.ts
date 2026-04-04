@@ -24,6 +24,8 @@ export interface LayoutOptions {
   seed?: number;
   containerWidth?: number;
   containerHeight?: number;
+  minItemWidth?: number;
+  maxItemWidth?: number;
 }
 
 /** Internal resolved options (all fields required) */
@@ -34,6 +36,8 @@ export interface ResolvedOptions {
   seed: number;
   containerWidth: number;
   containerHeight: number;
+  minItemWidth: number;
+  maxItemWidth: number;
 }
 
 /** Bounding box of the entire layout cluster */
