@@ -376,6 +376,74 @@ describe('Pendu', () => {
     });
   });
 
+  it('fires onLayoutChange callback with layout result', () => {
+    const handleLayoutChange = jest.fn();
+    render(
+      <Pendu seed={42} onLayoutChange={handleLayoutChange}>
+        <Pendu.Image src="/a.jpg" width={800} height={600} />
+        <Pendu.Image src="/b.jpg" width={600} height={900} />
+      </Pendu>,
+    );
+    expect(handleLayoutChange).toHaveBeenCalledTimes(1);
+    const result = handleLayoutChange.mock.calls[0][0];
+    expect(result.frames).toHaveLength(2);
+    expect(result.bounds).toBeDefined();
+    expect(result.stats).toBeDefined();
+    expect(result.stats.placed).toBe(2);
+  });
+
+  it('fires onLayoutChange again when children change', () => {
+    const handleLayoutChange = jest.fn();
+    const { rerender } = render(
+      <Pendu seed={42} onLayoutChange={handleLayoutChange}>
+        <Pendu.Image key="a" src="/a.jpg" width={800} height={600} />
+      </Pendu>,
+    );
+    expect(handleLayoutChange).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <Pendu seed={42} onLayoutChange={handleLayoutChange}>
+        <Pendu.Image key="a" src="/a.jpg" width={800} height={600} />
+        <Pendu.Image key="b" src="/b.jpg" width={600} height={900} />
+      </Pendu>,
+    );
+    expect(handleLayoutChange).toHaveBeenCalledTimes(2);
+    expect(handleLayoutChange.mock.calls[1][0].frames).toHaveLength(2);
+  });
+
+  it('passes lazy loading attribute to images when lazy=true', () => {
+    const { container } = render(
+      <Pendu seed={42} lazy>
+        <Pendu.Image src="/a.jpg" width={800} height={600} />
+      </Pendu>,
+    );
+    const img = container.querySelector('img')!;
+    expect(img.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('does not set loading attribute when lazy is not set', () => {
+    const { container } = render(
+      <Pendu seed={42}>
+        <Pendu.Image src="/a.jpg" width={800} height={600} />
+      </Pendu>,
+    );
+    const img = container.querySelector('img')!;
+    expect(img.getAttribute('loading')).toBeNull();
+  });
+
+  it('accepts minItemWidth and maxItemWidth props', () => {
+    const handleLayoutChange = jest.fn();
+    render(
+      <Pendu seed={42} minItemWidth={100} maxItemWidth={300} onLayoutChange={handleLayoutChange}>
+        <Pendu.Image src="/a.jpg" width={800} height={600} />
+        <Pendu.Image src="/b.jpg" width={600} height={900} />
+      </Pendu>,
+    );
+    expect(handleLayoutChange).toHaveBeenCalledTimes(1);
+    const result = handleLayoutChange.mock.calls[0][0];
+    expect(result.frames).toHaveLength(2);
+  });
+
   it('scales layout to fit width when cluster exceeds container', () => {
     // Use a narrow container (200px) with many images to force width scaling
     class NarrowObserver extends MockResizeObserver {

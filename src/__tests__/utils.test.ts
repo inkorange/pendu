@@ -61,6 +61,8 @@ describe('resolveOptions', () => {
     expect(opts.padding).toBe(10);
     expect(opts.containerWidth).toBe(680);
     expect(opts.containerHeight).toBe(500);
+    expect(opts.minItemWidth).toBe(0);
+    expect(opts.maxItemWidth).toBe(Infinity);
     expect(typeof opts.seed).toBe('number');
   });
 
@@ -70,6 +72,12 @@ describe('resolveOptions', () => {
     expect(opts.seed).toBe(42);
     expect(opts.minScale).toBe(0.3);
     expect(opts.containerWidth).toBe(680); // still default
+  });
+
+  it('uses provided minItemWidth and maxItemWidth', () => {
+    const opts = resolveOptions({ minItemWidth: 100, maxItemWidth: 400 });
+    expect(opts.minItemWidth).toBe(100);
+    expect(opts.maxItemWidth).toBe(400);
   });
 });
 
@@ -113,6 +121,33 @@ describe('computeBaseSize', () => {
     const size = computeBaseSize({ width: 1000, height: 990 }, 200, 200);
     expect(size.width).toBeLessThanOrEqual(200 * 0.6);
     expect(size.height).toBeLessThanOrEqual(200 * 0.6);
+  });
+
+  it('respects minItemWidth constraint', () => {
+    // Without constraint, many images produce small frames
+    const small = computeBaseSize({ width: 800, height: 600 }, 680, 500, 10);
+    const constrained = computeBaseSize({ width: 800, height: 600 }, 680, 500, 10, 200);
+    expect(constrained.width).toBeGreaterThanOrEqual(200);
+    expect(constrained.width).toBeGreaterThanOrEqual(small.width);
+  });
+
+  it('respects maxItemWidth constraint', () => {
+    const unconstrained = computeBaseSize({ width: 800, height: 600 }, 680, 500, 1);
+    const constrained = computeBaseSize({ width: 800, height: 600 }, 680, 500, 1, 0, 150);
+    expect(constrained.width).toBeLessThanOrEqual(150);
+    expect(constrained.width).toBeLessThanOrEqual(unconstrained.width);
+  });
+
+  it('preserves aspect ratio with minItemWidth', () => {
+    const size = computeBaseSize({ width: 800, height: 400 }, 680, 500, 10, 200);
+    const aspect = size.width / size.height;
+    expect(aspect).toBeCloseTo(2.0, 0);
+  });
+
+  it('preserves aspect ratio with maxItemWidth', () => {
+    const size = computeBaseSize({ width: 800, height: 400 }, 680, 500, 1, 0, 150);
+    const aspect = size.width / size.height;
+    expect(aspect).toBeCloseTo(2.0, 0);
   });
 });
 

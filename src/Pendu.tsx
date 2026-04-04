@@ -42,6 +42,10 @@ export interface PenduProps {
   seed?: number;
   animate?: boolean;
   animationDuration?: number;
+  lazy?: boolean;
+  minItemWidth?: number;
+  maxItemWidth?: number;
+  onLayoutChange?: (result: LayoutResult) => void;
   className?: string;
   style?: React.CSSProperties;
   children: React.ReactNode;
@@ -93,9 +97,16 @@ function extractChildren(children: React.ReactNode): ChildImageData[] {
   return result;
 }
 
-function buildLayoutKey(items: ChildImageData[], gap: number, minScale: number, seed: number | undefined): string {
+function buildLayoutKey(
+  items: ChildImageData[],
+  gap: number,
+  minScale: number,
+  seed: number | undefined,
+  minItemWidth: number | undefined,
+  maxItemWidth: number | undefined,
+): string {
   const dims = items.map((c) => `${c.key}:${c.imageData.width}x${c.imageData.height}`).join(',');
-  return `${dims}|${gap}|${minScale}|${seed ?? 'auto'}`;
+  return `${dims}|${gap}|${minScale}|${seed ?? 'auto'}|${minItemWidth ?? 0}|${maxItemWidth ?? 'inf'}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +120,10 @@ function PenduComponent({
   seed,
   animate = true,
   animationDuration = 300,
+  lazy = false,
+  minItemWidth,
+  maxItemWidth,
+  onLayoutChange,
   className,
   style,
   children,
@@ -198,8 +213,8 @@ function PenduComponent({
   const childItems = useMemo(() => extractChildren(children), [children]);
 
   const layoutKey = useMemo(
-    () => buildLayoutKey(childItems, gap, minScale, seed),
-    [childItems, gap, minScale, seed],
+    () => buildLayoutKey(childItems, gap, minScale, seed, minItemWidth, maxItemWidth),
+    [childItems, gap, minScale, seed, minItemWidth, maxItemWidth],
   );
 
   const layout: LayoutResult | null = useMemo(() => {
@@ -222,10 +237,25 @@ function PenduComponent({
         seed: effectiveSeed,
         containerWidth: availableWidth,
         containerHeight: availableHeight,
+        minItemWidth,
+        maxItemWidth,
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey, containerWidth, maxHeight]);
+
+  // ---------------------------------------------------------------------------
+  // Fire onLayoutChange callback
+  // ---------------------------------------------------------------------------
+
+  const onLayoutChangeRef = useRef(onLayoutChange);
+  onLayoutChangeRef.current = onLayoutChange;
+
+  useEffect(() => {
+    if (layout && onLayoutChangeRef.current) {
+      onLayoutChangeRef.current(layout);
+    }
+  }, [layout]);
 
   // ---------------------------------------------------------------------------
   // Compute fit scale (both axes)
@@ -437,6 +467,7 @@ function PenduComponent({
                 {...(child.props as PenduImageProps)}
                 _frameStyle={frameStyle}
                 _penduKey={child.key}
+                {...(lazy ? { loading: 'lazy' as const } : undefined)}
               />
             );
           })}

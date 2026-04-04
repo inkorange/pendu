@@ -79,6 +79,22 @@ describe('PenduImage', () => {
     expect((img as HTMLImageElement).style.opacity).toBe('1');
   });
 
+  it('sets loading attribute when provided', () => {
+    const { container } = render(
+      <PenduImage src="/photo.jpg" width={800} height={600} loading="lazy" />,
+    );
+    const img = container.querySelector('img')!;
+    expect(img.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('does not set loading attribute by default', () => {
+    const { container } = render(
+      <PenduImage src="/photo.jpg" width={800} height={600} />,
+    );
+    const img = container.querySelector('img')!;
+    expect(img.getAttribute('loading')).toBeNull();
+  });
+
   it('has displayName Pendu.Image', () => {
     expect(PenduImage.displayName).toBe('Pendu.Image');
   });

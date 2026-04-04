@@ -42,7 +42,7 @@ export function computeLayout(
   let failed = 0;
 
   // Place first frame at center
-  const firstBase = computeBaseSize(images[0], cw, ch, images.length);
+  const firstBase = computeBaseSize(images[0], cw, ch, images.length, opts.minItemWidth, opts.maxItemWidth);
   placed.push({
     width: firstBase.width,
     height: firstBase.height,
@@ -56,7 +56,7 @@ export function computeLayout(
   // Place remaining frames — prefer positions that stay within the
   // container bounds and fill empty space
   for (let i = 1; i < images.length; i++) {
-    const base = computeBaseSize(images[i], cw, ch, images.length);
+    const base = computeBaseSize(images[i], cw, ch, images.length, opts.minItemWidth, opts.maxItemWidth);
     let bestCandidate: PlacedFrame | null = null;
     let bestScore = -Infinity;
 
@@ -156,7 +156,7 @@ export function addToLayout(
   const centerY = bounds.minY + bounds.height / 2;
 
   const totalAfterAdd = frames.length + 1;
-  const base = computeBaseSize(newImage, opts.containerWidth, opts.containerHeight, totalAfterAdd);
+  const base = computeBaseSize(newImage, opts.containerWidth, opts.containerHeight, totalAfterAdd, opts.minItemWidth, opts.maxItemWidth);
   const scaleSteps = [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, opts.minScale];
 
   let bestCandidate: PlacedFrame | null = null;
