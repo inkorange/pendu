@@ -34,7 +34,7 @@
     "release": "npm run build && changeset publish",
     "size": "size-limit",
     "prepublishOnly": "npm run build",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "peerDependencies": {
     "react": ">=18",
